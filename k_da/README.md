@@ -19,6 +19,15 @@ k_da/
 │   ├── 03-npm-modules.js       # NPM dependencies (~7.8 MB)
 │   ├── 04-app-code.js          # Application logic (~1.2 MB)
 │   ├── 05-main.js              # Entry point (~4.4 KB)
+│   ├── i18n/                   # Internationalization files
+│   │   ├── index.js            # i18n module exports
+│   │   ├── locales/            # Translation files
+│   │   │   ├── en-US.js        # English locale
+│   │   │   └── ru-RU.js        # Russian locale
+│   │   └── assets/             # Banner assets
+│   │       ├── banner-large.txt
+│   │       ├── banner-medium.txt
+│   │       └── banner-small.txt
 │   └── README.md               # Source structure documentation
 ├── .env.example                # Environment variables reference
 ├── README.md                   # This file
@@ -31,6 +40,12 @@ k_da/
 node k_da/build.js
 ```
 
+The build script:
+1. Reads all source files from `src/` directory
+2. Loads i18n locale data from `src/i18n/locales/`
+3. Inlines the i18n objects directly into the bundle (replacing ES6 imports)
+4. Concatenates all files into a single executable `k_da.js`
+
 **To run the application:**
 ```bash
 ./k_da/k_da.js [options]
@@ -38,7 +53,7 @@ node k_da/build.js
 node k_da/k_da.js [options]
 ```
 
-> **Note**: The source files in `src/` are split for readability only. They share a webpack bundle closure scope and cannot run independently. Use `build.js` to create a working executable.
+> **Note**: The source files in `src/` are split for readability only. They share a webpack bundle closure scope and cannot run independently. The build script automatically inlines the i18n data from the `src/i18n/` directory into the final bundle, ensuring all translations are available at runtime without requiring external module imports.
 
 ## Table of Contents
 
@@ -548,6 +563,46 @@ As part of the deobfuscation process, significant I18N improvements were made:
 - Command descriptions
 - Settings labels and descriptions
 - ASCII art banners
+
+### I18N Build Process
+
+The i18n system is organized into separate modules for maintainability but gets inlined during the build:
+
+**Source Structure:**
+```
+src/i18n/
+├── index.js              # Module exports (not used in final bundle)
+├── locales/
+│   ├── en-US.js         # English translations (~38 KB)
+│   └── ru-RU.js         # Russian translations (~87 KB)
+└── assets/
+    ├── banner-large.txt
+    ├── banner-medium.txt
+    └── banner-small.txt
+```
+
+**Build Process:**
+1. The `build.js` script reads locale files from `src/i18n/locales/`
+2. It strips the ES6 `export` statements and converts them to plain objects
+3. The i18n data is inlined directly into the bundle at build time
+4. This avoids runtime ES6 module imports that would fail in the bundled context
+
+**Why Inlining?**
+- The webpack bundle cannot dynamically import ES6 modules at runtime
+- All code must be in a single file sharing the same closure scope
+- Inlining ensures translations are available without external dependencies
+
+To rebuild after modifying translations:
+```bash
+# Edit locale files in src/i18n/locales/
+vi k_da/src/i18n/locales/ru-RU.js
+
+# Rebuild the bundle
+node k_da/build.js
+
+# The updated translations are now in k_da.js
+./k_da/k_da.js
+```
 
 ## Troubleshooting
 
