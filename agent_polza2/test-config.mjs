@@ -1,0 +1,1 @@
+console.log("Testing polza config..."); const fs = require("fs"); const config = JSON.parse(fs.readFileSync("polza-config-example.json", "utf8")); console.log("Config loaded:", !!config.provider.polza); console.log("Polza models:", Object.keys(config.provider.polza.models)); console.log("Default model:", config.model);

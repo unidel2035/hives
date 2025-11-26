@@ -1,0 +1,1 @@
+import { Provider } from "./src/provider/provider.ts"; console.log("Checking polza provider..."); const providers = await Provider.list(); console.log("Available providers:", Object.keys(providers)); console.log("Polza found:", !!providers.polza); if (providers.polza) console.log("Polza models:", Object.keys(providers.polza.info.models));
