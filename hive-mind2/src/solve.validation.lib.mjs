@@ -237,6 +237,14 @@ export const performSystemChecks = async (minDiskSpace = 500, skipTool = false, 
         await log('❌ Cannot proceed without Codex connection', { level: 'error' });
         return false;
       }
+    } else if (argv.tool === 'polza') {
+      // Validate Polza AI connection
+      const polzaLib = await import('./polza.lib.mjs');
+      isToolConnected = await polzaLib.validatePolzaConnection(model);
+      if (!isToolConnected) {
+        await log('❌ Cannot proceed without Polza AI connection', { level: 'error' });
+        return false;
+      }
     } else {
       // Validate Claude CLI connection (default)
       const isClaudeConnected = await validateClaudeConnection(model);
