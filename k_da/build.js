@@ -30,10 +30,11 @@ const sourceFiles = [
   'src/05-main.js',
 ];
 
-// Read the shebang and imports from original (lines 1-5)
-const originalFile = path.join(__dirname, 'k_da_deobfuscated.js');
+// Read the shebang and imports from original.js (lines 1-2)
+// We use original.js instead of k_da_deobfuscated.js since it's the source file
+const originalFile = path.join(__dirname, 'original.js');
 const originalLines = fs.readFileSync(originalFile, 'utf8').split('\n');
-const shebang = originalLines.slice(0, 5).join('\n');
+const shebang = originalLines.slice(0, 2).join('\n');
 
 // Load .env file if it exists
 let envVars = {};
