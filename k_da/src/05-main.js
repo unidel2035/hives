@@ -1,11 +1,8 @@
-/* ============================================================================
+/**
  * Main entry function and bootstrap
  * Lines 278186-278315 from original k_da_deobfuscated.js
- * 
- * NOTE: This file is part of a webpack bundle split for readability.
- * It shares closure scope with other parts and cannot run independently.
- * Use the build script to create a working executable.
- * ============================================================================ */
+ * This file is part of the k_da application split from webpack bundle
+ */
 
 async function $ur() {
   sFn();

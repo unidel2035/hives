@@ -1,39 +1,4 @@
-// English (US) locale
-// Auto-generated from 04-app-code.js
-
 export const enUS = {
-    banner: {
-      large: `
- ███       █████   ████    ███████    ██████████     █████████
-   ███      ███   ███   ███     ███  ███    ███   ███     ███
-    ███   ███  ███    ███     ███ ███   ███ ███    ███
-      ███ ███████    ███      ███ ███    ███ ███████████████
-     ███  ███ ███   ███      ███ ███    ███ ███     ███
-   ███    ███  ███  ███     ███  ███    ███  ███    ███
- ███      █████  ████  ███████   ██████████   █████   █████
-
-`,
-      medium: `
- ███       █████   ████    ███████    ██████████     █████████
-   ███      ███   ███   ███     ███  ███    ███   ███     ███
-    ███   ███  ███    ███     ███ ███   ███ ███    ███
-      ███ ███████    ███      ███ ███    ███ ███████████████
-     ███  ███ ███   ███      ███ ███    ███ ███     ███
-   ███    ███  ███  ███     ███  ███    ███  ███    ███
- ███      █████  ████  ███████   ██████████   █████   █████
-
-`,
-      small: `
- ███       █████   ████
-   ███      ███   ███
-    ███   ███  ███
-      ███ ███████
-     ███  ███ ███
-   ███    ███  ███
- ███      █████  ████
-
-`,
-    },
     help: {
       basics: 'Basics:',
       addContext: 'Add context',
@@ -670,7 +635,7 @@ Do NOT use this tool:
         footerLabel: 'trial requests {used}{limitPart}',
         limitReached: `\u26A1 You have used all available Koda trial requests.
 \u26A1 Further requests are paused until the trial resets.
-\u26A1 Configure permanent access with /auth or visit ${process.env.KODA_SITE_URL || 'https://kodacode.ru'} .`,
+\u26A1 Configure permanent access with /auth or visit https://kodacode.ru .`,
       },
       auth: {
         reauthRequired: 'Reauthentication required',
@@ -787,4 +752,4 @@ Do NOT use this tool:
       },
       extensions: { noActive: 'No active extensions.', activeTitle: 'Active extensions:' },
     },
-  };
+  },

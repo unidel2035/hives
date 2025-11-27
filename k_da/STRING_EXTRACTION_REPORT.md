@@ -1,36 +1,14 @@
 # K_DA String Extraction Report
 
-Generated: 2025-11-27T11:36:16.730Z
+Generated: 2025-11-27T12:29:13.511Z
 
 ## Summary
 
-This report documents all strings, URLs, and content extracted from the k_da source code
-to ensure complete deobfuscation and proper configuration externalization.
-
-## Statistics
-
-- **Unicode Escape Sequences Converted**: 17638
-- **HTTP URLs Found**: 2
+- **Unicode Escape Sequences Converted**: 17 638
 - **HTTPS URLs Found**: 13
-- **HTML Blocks Found**: 0
-- **SVG Blocks Found**: 0
 - **Environment Variables Used**: 52
 
-## File Changes
-
-- **Input File**: /tmp/gh-issue-solver-1764243147281/k_da/src/04-app-code.js
-- **Original Size**: 1224.82 KB
-- **New Size**: 1138.70 KB
-- **Size Change**: -86.12 KB
-
-## Extracted URLs
-
-### HTTP URLs (2)
-
-1. `http://localhost:8877`
-2. `http://localhost:8877;`
-
-### HTTPS URLs (13)
+## URLs
 
 1. `https://github.com/vadimdemedes/ink/#israwmodesupported`
 2. `https://kodacode.ru`
@@ -46,28 +24,7 @@ to ensure complete deobfuscation and proper configuration externalization.
 12. `https://policies.google.com/privacy`
 13. `https://api.kodacode.ru`
 
-## URL Configuration Status
-
-The following URLs should be configurable via environment variables:
-
-| URL | Environment Variable | Status |
-|-----|---------------------|--------|
-| `https://kodacode.ru` | `KODA_SITE_URL` | ⚠️ Needs config |
-| `https://github.com/login/device/code` | `GITHUB_DEVICE_CODE_URL` | ⚠️ Needs config |
-| `https://github.com/login/oauth/access_token` | `GITHUB_OAUTH_TOKEN_URL` | ⚠️ Needs config |
-| `https://docs.kodacode.ru/koda-cli/` | `KODA_DOCS_URL` | ⚠️ Needs config |
-| `https://cli-companion.kodacode.ru/` | `KODA_IDE_COMPANION_URL` | ⚠️ Needs config |
-| `https://api.kodacode.ru` | `KODA_API_BASE` | ✅ Configured |
-
-## HTML/SVG Content
-
-*(No HTML content found)*
-
-*(No SVG content found)*
-
 ## Environment Variables
-
-The following 52 environment variables are used in the code:
 
 1. `BUILD_SANDBOX`
 2. `CLOUD_SHELL`
@@ -124,46 +81,10 @@ The following 52 environment variables are used in the code:
 
 ## Recommendations
 
-### 1. Unicode Conversion
-✅ **Completed**: Converted 17638 Unicode escape sequences to readable characters.
-
-### 2. URL Configuration
-⚠️ **Review needed**: Found 13 hardcoded URLs. Ensure all service URLs are configurable via environment variables.
-
-### 3. HTML/SVG Extraction
-✅ **No action needed**: No embedded HTML/SVG content found.
-
-### 4. Configuration Externalization
-- Ensure all service URLs have fallback defaults
-- Document all environment variables in .env.example
-- Add validation for required environment variables
-- Consider using a configuration module for better organization
-
-## Next Steps
-
-1. ✅ Unicode escape sequences converted to readable characters
-2. ⏳ Verify all URLs are properly configurable
-3. ⏳ Review environment variable usage
-4. ⏳ Update .env.example with any missing variables
-5. ⏳ Test the build with different configurations
-
-## Verification
-
-To verify the extraction was successful:
-
-```bash
-# Check for remaining Unicode escapes
-grep -c "\\\\u[0-9a-fA-F]" k_da/src/04-app-code.js
-
-# Check for hardcoded URLs
-grep -n "https://" k_da/src/04-app-code.js | grep -v "process.env"
-
-# Rebuild and test
-cd k_da
-node build.js
-node k_da.js --help
-```
+1. All service URLs should be configurable via environment variables
+2. Test the build with different configurations
+3. Review environment variable usage for security
 
 ---
 
-*This report was generated automatically by the string extraction script.*
+*This report was generated automatically by k_da-tools.js*

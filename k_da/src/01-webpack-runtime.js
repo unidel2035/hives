@@ -1,11 +1,8 @@
-/* ============================================================================
+/**
  * Webpack module system and runtime utilities
- * Lines 6-38 from original k_da_deobfuscated.js
- * 
- * NOTE: This file is part of a webpack bundle split for readability.
- * It shares closure scope with other parts and cannot run independently.
- * Use the build script to create a working executable.
- * ============================================================================ */
+ * Lines 6-39 from original k_da_deobfuscated.js
+ * This file is part of the k_da application split from webpack bundle
+ */
 
 var ocr = Object.create;
 var oK = Object.defineProperty;
@@ -40,3 +37,4 @@ var qe = (t, e, r) => (
     L$e(e || !t || !t.__esModule ? oK(r, 'default', { value: t, enumerable: !0 }) : r, t)
   ),
   gr = (t) => L$e(oK({}, '__esModule', { value: !0 }), t);
+var Y$e = T((sa) => {

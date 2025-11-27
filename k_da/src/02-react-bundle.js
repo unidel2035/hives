@@ -1,13 +1,9 @@
-/* ============================================================================
+/**
  * React library bundle (v19.1.0)
- * Lines 39-20500 from original k_da_deobfuscated.js
- * 
- * NOTE: This file is part of a webpack bundle split for readability.
- * It shares closure scope with other parts and cannot run independently.
- * Use the build script to create a working executable.
- * ============================================================================ */
+ * Lines 40-20500 from original k_da_deobfuscated.js
+ * This file is part of the k_da application split from webpack bundle
+ */
 
-var Y$e = T((sa) => {
   'use strict';
   var d2e = Symbol.for('react.transitional.element'),
     pcr = Symbol.for('react.portal'),
@@ -797,7 +793,7 @@ var W$e = T((zi, uK) => {
               console.error(
                 `lazy: Expected the result of a dynamic import() call. Instead received: %s
 
-Your code should look like:
+Your code should look like: 
   const MyComponent = lazy(() => import('./MyComponent'))
 
 Did you accidentally put curly braces around the import?`,
@@ -807,7 +803,7 @@ Did you accidentally put curly braces around the import?`,
               console.error(
                 `lazy: Expected the result of a dynamic import() call. Instead received: %s
 
-Your code should look like:
+Your code should look like: 
   const MyComponent = lazy(() => import('./MyComponent'))`,
                 rt
               ),
