@@ -195,9 +195,24 @@ function splitFile() {
     ];
   }
 
+  // First, create the shebang file (lines 1-2 from k_da_deobfuscated.js)
+  log(`[0/${splits.length + 1}] Creating src/00-shebang.js...`);
+  const shebangLines = lines.slice(0, 2);
+  const shebangContent = shebangLines.join("\n");
+  const shebangPath = path.join(__dirname, "src/00-shebang.js");
+
+  let shebangFileContent = `/**\n * Shebang and module setup\n`;
+  shebangFileContent += ` * Lines 1-2 from original k_da_deobfuscated.js\n`;
+  shebangFileContent += ` * This file contains the Node.js shebang and ES module compatibility setup\n */\n\n`;
+  shebangFileContent += shebangContent;
+
+  fs.writeFileSync(shebangPath, shebangFileContent);
+  const shebangSizeMB = (shebangFileContent.length / 1024 / 1024).toFixed(2);
+  success(`00-shebang.js - ${shebangLines.length.toLocaleString()} lines, ${shebangSizeMB} MB`);
+
   // Extract each section
   splits.forEach((split, index) => {
-    log(`[${index + 1}/${splits.length}] Creating ${split.filename}...`);
+    log(`[${index + 1}/${splits.length + 1}] Creating ${split.filename}...`);
 
     const sectionLines = lines.slice(split.start, split.end);
     const sectionContent = sectionLines.join("\n");

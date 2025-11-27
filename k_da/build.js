@@ -23,17 +23,13 @@ console.log('Building k_da.js from split sources...\n');
 
 // Files to concatenate in order
 const sourceFiles = [
+  'src/00-shebang.js',
   'src/01-webpack-runtime.js',
   'src/02-react-bundle.js',
   'src/03-npm-modules.js',
   'src/04-app-code.js',
   'src/05-main.js',
 ];
-
-// Read the shebang and imports from original (lines 1-5)
-const originalFile = path.join(__dirname, 'k_da_deobfuscated.js');
-const originalLines = fs.readFileSync(originalFile, 'utf8').split('\n');
-const shebang = originalLines.slice(0, 5).join('\n');
 
 // Load .env file if it exists
 let envVars = {};
@@ -123,8 +119,8 @@ function inlineEnvironmentVariables(content) {
   return content;
 }
 
-// Start with shebang
-let output = shebang + '\n\n';
+// Start with empty output (shebang will come from 00-shebang.js)
+let output = '';
 
 // Concatenate all source files
 sourceFiles.forEach((file, index) => {
@@ -134,6 +130,12 @@ sourceFiles.forEach((file, index) => {
 
   // Remove the header comment (everything before the first non-comment line)
   content = content.replace(/^\/\*[\s\S]*?\*\/\s*/, '');
+
+  // Special handling for 00-shebang.js - add proper spacing after it
+  if (file === 'src/00-shebang.js') {
+    output += content + '\n\n';
+    return;
+  }
 
   // Special handling for 04-app-code.js - replace i18n import with inline data
   if (file === 'src/04-app-code.js') {
