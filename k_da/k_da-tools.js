@@ -308,6 +308,8 @@ function extractI18n() {
   log("Extracting ASCII banners...");
   const enFile = fs.readFileSync(path.join(localesDir, "en-US.js"), "utf8");
 
+  let bannersFound = 0;
+
   // Extract large banner
   const largeBannerMatch = enFile.match(/large:\s*`([^`]+)`/s);
   if (largeBannerMatch) {
@@ -316,6 +318,7 @@ function extractI18n() {
       largeBannerMatch[1].trim(),
     );
     success("Large banner extracted: src/i18n/assets/banner-large.txt");
+    bannersFound++;
   }
 
   // Extract medium banner
@@ -326,6 +329,7 @@ function extractI18n() {
       mediumBannerMatch[1].trim(),
     );
     success("Medium banner extracted: src/i18n/assets/banner-medium.txt");
+    bannersFound++;
   }
 
   // Extract small banner
@@ -336,6 +340,11 @@ function extractI18n() {
       smallBannerMatch[1].trim(),
     );
     success("Small banner extracted: src/i18n/assets/banner-small.txt");
+    bannersFound++;
+  }
+
+  if (bannersFound === 0) {
+    log("⚠ No ASCII banners found in locale data (this is normal for some versions)");
   }
 
   // Конвертируем Unicode в нормальную кириллицу
