@@ -1,2 +1,6 @@
 node_modules/
 *.backup
+# K_DA generated files
+k_da/k_da.js
+k_da/k_da_deobfuscated.js
+k_da/src/
