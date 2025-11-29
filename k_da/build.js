@@ -341,7 +341,107 @@ sourceFiles.forEach((file, index) => {
       }
     }
 
-    // Insert the i18n objects
+    // First, remove old hard-coded i18n objects to avoid conflicts
+    console.log('   → Removing old hard-coded i18n objects from app code...');
+    
+    // Remove English locale object (var hDn = { ... }) - find and remove the entire object
+    const enStartPattern = /var\s+hDn\s*=\s*\{/;
+    const enStartMatch = content.match(enStartPattern);
+    if (enStartMatch) {
+      const startPos = enStartMatch.index;
+      let braceCount = 0;
+      let pos = startPos;
+      let foundEnd = false;
+      
+      // Find the matching closing brace
+      while (pos < content.length && !foundEnd) {
+        const char = content[pos];
+        if (char === '"' || char === "'" || char === '`') {
+          const quote = char;
+          pos++;
+          while (pos < content.length && content[pos] !== quote) {
+            if (content[pos] === '\\') pos++;
+            pos++;
+          }
+        } else if (char === '{') {
+          braceCount++;
+        } else if (char === '}') {
+          braceCount--;
+          if (braceCount === 0) {
+            // Found the end, include trailing semicolon, comma, and newlines
+            let endPos = pos + 1;
+            while (endPos < content.length && (content[endPos] === ';' || content[endPos] === ',' || content[endPos] === '\n' || content[endPos] === ' ' || content[endPos] === '\r')) {
+              endPos++;
+            }
+            content = content.slice(0, startPos) + content.slice(endPos);
+            console.log('   → Removed old English locale object (hDn)');
+            foundEnd = true;
+          }
+        }
+        pos++;
+      }
+    }
+
+    // Remove Russian locale object (ADn = { ... }) - find and remove the entire object  
+    const ruStartPattern = /\bADn\s*=\s*\{/;
+    const ruStartMatch = content.match(ruStartPattern);
+    if (ruStartMatch) {
+      const startPos = ruStartMatch.index;
+      let braceCount = 0;
+      let pos = startPos;
+      let foundEnd = false;
+      
+      // Find the matching closing brace
+      while (pos < content.length && !foundEnd) {
+        const char = content[pos];
+        if (char === '"' || char === "'" || char === '`') {
+          const quote = char;
+          pos++;
+          while (pos < content.length && content[pos] !== quote) {
+            if (content[pos] === '\\') pos++;
+            pos++;
+          }
+        } else if (char === '{') {
+          braceCount++;
+        } else if (char === '}') {
+          braceCount--;
+          if (braceCount === 0) {
+            // Found the end, include trailing semicolon, comma, and newlines
+            let endPos = pos + 1;
+            while (endPos < content.length && (content[endPos] === ';' || content[endPos] === ',' || content[endPos] === '\n' || content[endPos] === ' ' || content[endPos] === '\r')) {
+              endPos++;
+            }
+            content = content.slice(0, startPos) + content.slice(endPos);
+            console.log('   → Removed old Russian locale object (ADn)');
+            foundEnd = true;
+          }
+        }
+        pos++;
+      }
+    }
+    
+    // Clean up any remaining duplicate commas and newlines
+    content = content.replace(/,\s*,\s*/g, ','); // Remove double commas
+    content = content.replace(/\n\s*\n\s*\n/g, '\n\n'); // Remove triple newlines
+
+    // Insert the i18n objects at a safe location (after initial variable declarations)
+    const lines = content.split('\n');
+    let insertLine = 0;
+    
+    // Find a safe insertion point after the first few lines but before any objects
+    for (let i = 0; i < Math.min(20, lines.length); i++) {
+      const line = lines[i].trim();
+      // Stop when we find a line that starts an object or array
+      if (line && !line.startsWith('//') && !line.startsWith('/*') && 
+          !line.startsWith('var ') && !line.startsWith('const ') && 
+          !line.includes('{') && !line.includes('[') && !line.includes('(')) {
+        insertLine = i + 1;
+        break;
+      }
+    }
+    
+    const insertPos = content.split('\n').slice(0, insertLine).join('\n').length + (insertLine > 0 ? 1 : 0);
+    
     const i18nInline = `// === Inlined i18n locale data ===
 // These objects were extracted from the i18n module during build
 ${enUSObject}
@@ -364,88 +464,9 @@ ${polzaClientCode}
       console.log('   → Polza AI client code inlined successfully');
     }
 
-    content = content.slice(0, i18nCommentIndex) + inlineContent + content.slice(i18nCommentIndex);
+    content = content.slice(0, insertPos) + inlineContent + content.slice(insertPos);
 
-    // Remove old hard-coded i18n objects from the app code
-    // This prevents duplicate i18n data and ensures changes to locale files are applied
-    console.log('   → Removing old hard-coded i18n objects from app code...');
-
-        // Remove English locale object (var hDn = { ... })
-    const oldEnPattern = /var\s+hDn\s*=\s*\{/;
-    const enMatch = content.match(oldEnPattern);
-    if (enMatch) {
-      const startPos = enMatch.index;
-      // Find the matching closing brace for this object
-      let braceCount = 0;
-      let pos = content.indexOf('{', startPos);
-      let foundEnd = false;
-
-      while (pos < content.length && !foundEnd) {
-        const char = content[pos];
-        // Skip string content to avoid counting braces inside strings
-        if (char === '"' || char === "'" || char === '`') {
-          const quote = char;
-          pos++;
-          while (pos < content.length && content[pos] !== quote) {
-            if (content[pos] === '\\') pos++; // Skip escaped characters
-            pos++;
-          }
-        } else if (char === '{') {
-          braceCount++;
-        } else if (char === '}') {
-          braceCount--;
-          if (braceCount === 0) {
-            // Found the end, remove this entire variable declaration
-            let endPos = pos + 1;
-            // Skip any trailing semicolons or commas
-            while (endPos < content.length && (content[endPos] === ';' || content[endPos] === ',')) {
-              endPos++;
-            }
-            content = content.slice(0, startPos) + content.slice(endPos);
-            console.log('   → Removed old English locale object');
-            foundEnd = true;
-          }
-        }
-        pos++;
-      }
-    }
-
-    // Remove Russian locale object (ADn = { ... })
-    const oldRuPattern = /\bADn\s*=\s*\{/;
-    const ruMatch = content.match(oldRuPattern);
-    if (ruMatch) {
-      const startPos = ruMatch.index;
-      let braceCount = 0;
-      let pos = content.indexOf('{', startPos);
-      let foundEnd = false;
-
-      while (pos < content.length && !foundEnd) {
-        const char = content[pos];
-        // Skip string content to avoid counting braces inside strings
-        if (char === '"' || char === "'" || char === '`') {
-          const quote = char;
-          pos++;
-          while (pos < content.length && content[pos] !== quote) {
-            if (content[pos] === '\\') pos++; // Skip escaped characters
-            pos++;
-          }
-        } else if (char === '{') {
-          braceCount++;
-        } else if (char === '}') {
-          braceCount--;
-          if (braceCount === 0) {
-            let endPos = pos + 1;
-            while (endPos < content.length && (content[endPos] === ';' || content[endPos] === ',')) {
-              endPos++;
-            }
-            content = content.slice(0, startPos) + content.slice(endPos);
-            console.log('   → Removed old Russian locale object');
-            foundEnd = true;
-          }
-        }
-        pos++;
-      }
-    }
+        
 
     // Fix references to deleted locale objects
     console.log('   → Fixing references to deleted locale objects...');
@@ -463,10 +484,25 @@ ${polzaClientCode}
       return 'ruRU';
     });
 
+    // Fix initialization order by using var declarations (hoisted)
+    console.log('   → Converting i18n object declarations to var for proper hoisting...');
+    
+    // Replace const with var for enUS and ruRU to enable hoisting
+    content = content.replace(/const\s+enUS\s*=\s*\{/g, 'var enUS = {');
+    content = content.replace(/const\s+ruRU\s*=\s*\{/g, 'var ruRU = {');
+    
+    console.log('   → Converted const to var for i18n object declarations');
+    
     // Fix variable declaration for nXt (add const if missing)
     content = content.replace(
-      /(\s+)nXt\s*=\s*\{\s*en:\s*enUS,\s*ru:\s*ruRU\s*\}/,
+      /(\s+)nXt\s*=\s*\{\s*en:\s*hDn,\s*ru:\s*ADn\s*\}/,
       '$1const nXt = { en: enUS, ru: ruRU }'
+    );
+    
+    // Also handle the case where nXt was left without const
+    content = content.replace(
+      /^nXt\s*=\s*\{\s*en:\s*enUS,\s*ru:\s*ruRU\s*\}/m,
+      'const nXt = { en: enUS, ru: ruRU }'
     );
     
     if (referenceFixes > 0) {
