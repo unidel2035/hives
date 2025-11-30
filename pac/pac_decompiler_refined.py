@@ -39,30 +39,84 @@ class LZPDecompressor:
     def patternreplace(self, s: str, lzpmask: bool = False) -> str:
         """
         Implements JavaScript patternreplace function
-        Replaces encoded patterns with their actual values
+
+        CRITICAL: JavaScript code does s.split(patterns[pattern]).join(pattern)
+        This means it replaces the VALUE with the KEY (reverse direction!)
+
+        This function is ONLY used for encoding the mask (lzpmask=True).
+        For domain decompression, use patternexpand() instead.
         """
         if lzpmask:
             # Patterns for LZP mask decoding
-            patterns = [
-                ('AA', '!'), ('gA', '@'), ('AB', '#'), ('AQ', '$'),
-                ('AE', '%'), ('AC', '^'), ('AI', '*'), ('Ag', '('),
-                ('AD', ')'), ('Aw', '['), ('AM', ']'), ('Bg', '-'),
-                ('CA', ','), ('IA', '.'), ('BA', '?')
-            ]
+            # Format: 'KEY': 'VALUE' but we replace VALUE -> KEY
+            patterns = {
+                'AA': '!', 'gA': '@', 'AB': '#', 'AQ': '$',
+                'AE': '%', 'AC': '^', 'AI': '*', 'Ag': '(',
+                'AD': ')', 'Aw': '[', 'AM': ']', 'Bg': '-',
+                'CA': ',', 'IA': '.', 'BA': '?'
+            }
         else:
-            # Patterns for domain data (not used in current implementation)
-            patterns = []
+            # Patterns for domain data (encoding direction: VALUE -> KEY)
+            patterns = {}
 
         result = s
-        for pattern, replacement in patterns:
-            result = result.replace(pattern, replacement)
+        # Replace VALUE with KEY (reversed from typical replacement)
+        for pattern_key, pattern_value in patterns.items():
+            result = result.replace(pattern_value, pattern_key)
 
         return result
 
-    def a2b(self, encoded: str) -> bytes:
+    def patternexpand(self, s: str) -> str:
+        """
+        Expands compressed patterns in decompressed domain data.
+        This is the OPPOSITE of patternreplace - it expands KEY -> VALUE.
+
+        CRITICAL FIX FOR BUG #57:
+        After LZP decompression, the domain data still contains compressed patterns.
+        These patterns must be expanded to get readable domain names.
+
+        For example:
+        - 'sV' -> 'sex' (s + V->ex)
+        - 'mI' -> 'mon' (m + I->on)
+        - '!A' -> 'porn'
+        - '@gw' -> 'kagw' (@->ka + g + w)
+
+        This function must be applied AFTER unlzp decompression.
+        """
+        # Domain patterns - expand KEY to VALUE (opposite of patternreplace)
+        # Order matters: process longer patterns first to avoid partial replacements
+        patterns_ordered = [
+            # Two-character patterns first (to avoid conflicts)
+            ('!A', 'porn'), ('!B', 'film'), ('!C', 'lord'), ('!D', 'kino'), ('!E', 'oker'), ('!F', 'trad'),
+            ('!G', 'line'), ('!H', 'game'), ('!I', 'pdom'), ('!J', 'tion'), ('!K', '.com'), ('!L', 'leon'),
+            ('!M', 'port'), ('!N', 'shop'), ('!O', 'club'), ('!P', 'prav'), ('!Q', 'vest'), ('!R', 'inco'),
+            ('!S', 'mark'), ('!T', 'ital'), ('!U', 'slot'), ('!V', 'play'), ('!W', 'eria'), ('!X', 'russ'),
+            ('!Y', 'vide'), ('!Z', 'tube'), ('!@', 'medi'), ('!#', 'ster'), ('!$', 'star'), ('!%', 'nter'),
+            ('!^', 'scho'), ('!&', 'free'), ('!*', 'enta'), ('!(', 'best'), ('!)', 'mega'), ('!=', 'gama'),
+            ('!+', 'prof'), ('!/', 'oney'), ('!,', 'rypt'), ('!<', 'kra3'), ('!>', 'stor'), ('!~', 'ture'),
+            ('![', 'tech'), ('!]', 'ance'), ('!{', 'coin'), ('!}', 'seed'), ('!`', 'anim'), ('!:', 'stro'),
+            ('!;', 'ment'), ('!?', 'site'),
+            # Single-character patterns last
+            ('A', 'in'), ('B', 'an'), ('C', 'er'), ('D', 'ar'), ('E', 'or'),
+            ('F', 'et'), ('G', 'al'), ('H', 'st'), ('I', 'on'), ('J', 'en'), ('K', 'at'), ('L', 'ro'), ('M', 'es'),
+            ('N', 'as'), ('O', 'el'), ('P', 'it'), ('Q', 'ch'), ('R', 'am'), ('S', 'ol'), ('T', 'om'), ('U', 'ra'),
+            ('V', 'ex'), ('W', 'is'), ('X', 'ic'), ('Y', 're'), ('Z', 'os'), ('@', 'ka'), ('#', 'ot'), ('$', 'us'),
+            ('%', 'ap'), ('^', 'ov'), ('&', 'im'), ('*', '-s'), ('(', 'ad'), (')', 'il'), ('=', 'op'), ('+', 'ed'),
+            ('/', 'em'), (',', 'a-'), ('<', 'od'), ('>', 'ir'), ('~', 'id'), ('[', 'ob'), (']', 'ag'), ('{', 'ig'),
+            ('}', 'ip'), ('`', 'ok'), (':', 'e-'), (';', 'ec'), ('?', 'un')
+        ]
+
+        result = s
+        # Expand KEY to VALUE (normal replacement direction)
+        for pattern_key, pattern_value in patterns_ordered:
+            result = result.replace(pattern_key, pattern_value)
+
+        return result
+
+    def a2b(self, encoded: str) -> str:
         """
         Implements JavaScript a2b function
-        Converts ASCII-safe base64 to binary data
+        Converts ASCII-safe base64 to binary data and returns as string
         """
         try:
             # Apply pattern replacement for LZP mask
@@ -74,13 +128,15 @@ class LZPDecompressor:
                 processed += '=' * (4 - missing_padding)
 
             # Decode base64
-            decoded = base64.b64decode(processed)
-            return decoded
+            decoded_bytes = base64.b64decode(processed)
+
+            # Return as string (JavaScript returns string from a2b)
+            return decoded_bytes.decode('latin-1')  # Use latin-1 to preserve byte values
         except Exception as e:
             print(f"⚠ Warning: a2b decoding failed: {e}")
-            return b''
+            return ''
 
-    def unlzp(self, data: str, mask: bytes, limit: int) -> Tuple[str, int, int]:
+    def unlzp(self, data: str, mask: str, limit: int) -> Tuple[str, int, int]:
         """
         Implements JavaScript unlzp function
         Decompresses LZP-encoded data using the mask
@@ -100,7 +156,7 @@ class LZPDecompressor:
                 if mask_pos >= len(mask):
                     break
 
-                mask_byte = mask[mask_pos]
+                mask_byte = ord(mask[mask_pos])
                 mask_pos += 1
 
                 # Process 8 bits of the mask byte
@@ -223,7 +279,7 @@ class RefinedPACDecompiler:
         self.special_cidrs = []
         self.domains_lzp = ""
         self.mask_lzp_encoded = ""
-        self.mask_lzp_decoded = b''
+        self.mask_lzp_decoded = ''
         self.proxy_rules = ""
 
         # Components
@@ -433,10 +489,17 @@ class RefinedPACDecompiler:
 
                     # Extract required characters from leftover
                     if len(leftover) >= required_chars:
-                        self.domains[zone][length_key] = leftover[:required_chars]
+                        # Extract compressed domain data
+                        compressed_data = leftover[:required_chars]
                         leftover = leftover[required_chars:]
-                        zone_decompressed += required_chars
-                        self.stats['total_domains_decompressed'] += required_chars
+
+                        # CRITICAL FIX: Expand patterns to get readable domains
+                        # The decompressed data still contains compressed patterns that must be expanded
+                        expanded_data = self.lzp_decompressor.patternexpand(compressed_data)
+
+                        self.domains[zone][length_key] = expanded_data
+                        zone_decompressed += len(expanded_data)
+                        self.stats['total_domains_decompressed'] += len(expanded_data)
                     else:
                         # Not enough data
                         self.domains[zone][length_key] = f"<LZP_ERROR: need {required_chars}, got {len(leftover)}>"
@@ -540,11 +603,17 @@ class RefinedPACDecompiler:
                             if isinstance(data, str) and not data.startswith('<LZP_ERROR'):
                                 # Split domains (they're concatenated by length)
                                 domains = [data[i:i+int(length)] for i in range(0, len(data), int(length))]
-                                f.write(f"\nLength {length} ({len(domains)} domains):\n")
-                                for i, domain in enumerate(domains[:20], 1):  # Show first 20
-                                    f.write(f"  {i}. {domain}.{zone}\n")
-                                if len(domains) > 20:
-                                    f.write(f"  ... and {len(domains) - 20} more\n")
+
+                                # CRITICAL FIX: Filter out domains with null characters
+                                # Null characters indicate padding or invalid domains
+                                valid_domains = [d for d in domains if '\x00' not in d]
+
+                                if valid_domains:  # Only write section if there are valid domains
+                                    f.write(f"\nLength {length} ({len(valid_domains)} domains, {len(domains) - len(valid_domains)} filtered):\n")
+                                    for i, domain in enumerate(valid_domains[:20], 1):  # Show first 20
+                                        f.write(f"  {i}. {domain}.{zone}\n")
+                                    if len(valid_domains) > 20:
+                                        f.write(f"  ... and {len(valid_domains) - 20} more\n")
                 print(f"  ✓ Domains by zone: {domains_file}")
 
             print(f"✓ Export completed successfully")
