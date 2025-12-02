@@ -33,7 +33,7 @@ export async function processPrompt(prompt, yolomode = false) {
     metadata.filesIncluded = fileResult.filesIncluded;
     metadata.errors.push(...fileResult.errors);
 
-    // Step 2: Process !{shell} commands
+    // Step 2: Process ! shell commands (both !command and !{command} syntax)
     if (yolomode) {
       const shellResult = await processShellCommands(processed);
       processed = shellResult.prompt;
@@ -41,10 +41,10 @@ export async function processPrompt(prompt, yolomode = false) {
       metadata.errors.push(...shellResult.errors);
     } else {
       // Check if there are shell commands but yolo mode is off
-      if (processed.includes('!{')) {
+      if (hasShellCommand(processed)) {
         metadata.errors.push({
           type: 'shell_disabled',
-          message: 'Shell commands (!{...}) detected but YOLO mode is not enabled. Use --yolomode flag to enable shell execution.'
+          message: 'Shell commands (!command or !{...}) detected but YOLO mode is not enabled. Use --yolomode flag to enable shell execution.'
         });
       }
     }
@@ -156,7 +156,15 @@ async function readFileOrDirectory(filePath) {
 }
 
 /**
- * Process !{shell command} syntax
+ * Check if prompt contains shell commands
+ */
+function hasShellCommand(prompt) {
+  // Match !{...} or !command (at start of line or after whitespace)
+  return /!\{/.test(prompt) || /(^|\s)![a-zA-Z]/.test(prompt);
+}
+
+/**
+ * Process shell commands (supports both !{command} and !command syntax)
  */
 async function processShellCommands(prompt) {
   const commands = [];
@@ -164,21 +172,44 @@ async function processShellCommands(prompt) {
   let processed = prompt;
 
   // Match !{...} with support for nested braces
-  const shellRegex = /!\{([^}]*(?:\{[^}]*\}[^}]*)*)\}/g;
+  const bracedShellRegex = /!\{([^}]*(?:\{[^}]*\}[^}]*)*)\}/g;
+
+  // Match !command (word after !, but not if it's !{)
+  // Only match at start of line or after whitespace
+  const directShellRegex = /(^|\s)!([a-zA-Z][^\s]*(?:\s+[^\s@!]+)*)/g;
 
   const matches = [];
   let match;
-  while ((match = shellRegex.exec(prompt)) !== null) {
+
+  // Find all braced shell commands !{...}
+  while ((match = bracedShellRegex.exec(prompt)) !== null) {
     matches.push({
       fullMatch: match[0],
       command: match[1].trim(),
-      index: match.index
+      index: match.index,
+      type: 'braced'
     });
   }
 
-  // Process in reverse order
-  for (let i = matches.length - 1; i >= 0; i--) {
-    const { fullMatch, command, index } = matches[i];
+  // Find all direct shell commands !command
+  while ((match = directShellRegex.exec(prompt)) !== null) {
+    const whitespace = match[1];
+    const commandText = match[2];
+    matches.push({
+      fullMatch: match[0],
+      command: commandText.trim(),
+      index: match.index + whitespace.length,
+      type: 'direct',
+      whitespace
+    });
+  }
+
+  // Sort by index (descending) and remove duplicates
+  matches.sort((a, b) => b.index - a.index);
+
+  // Process in reverse order to maintain indices
+  for (let i = 0; i < matches.length; i++) {
+    const { fullMatch, command, index, type, whitespace } = matches[i];
 
     try {
       const { stdout, stderr } = await execAsync(command, {
@@ -222,5 +253,5 @@ async function processShellCommands(prompt) {
  * Check if prompt contains special syntax
  */
 export function hasSpecialSyntax(prompt) {
-  return /@[\w./]/.test(prompt) || /!\{/.test(prompt);
+  return /@[\w./]/.test(prompt) || hasShellCommand(prompt);
 }

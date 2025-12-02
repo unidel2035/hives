@@ -17,6 +17,8 @@ import { processPrompt, hasSpecialSyntax } from './lib/prompt-processor.js';
 import { CommandLoader, parseCustomCommand } from './lib/command-loader.js';
 import { MemoryManager } from './lib/memory-manager.js';
 import { SettingsManager } from './lib/settings-manager.js';
+import { createCompleter, updateCompleter } from './lib/autocomplete.js';
+import { PolzaMdLoader, createDefaultPolzaMd } from './lib/polza-md-loader.js';
 
 // ANSI color codes
 const colors = {
@@ -40,6 +42,7 @@ class PolzaCLI {
     this.commandLoader = new CommandLoader();
     this.memoryManager = new MemoryManager();
     this.settingsManager = new SettingsManager();
+    this.polzaMdLoader = new PolzaMdLoader();
 
     // Options from command line
     this.yolomode = options.yolomode || options.yolo || false;
@@ -48,6 +51,7 @@ class PolzaCLI {
     this.model = options.model || null;
     this.outputFormat = options.outputFormat || 'text';
     this.markdownEnabled = true;
+    this.customInstructions = '';
   }
 
   /**
@@ -61,6 +65,9 @@ class PolzaCLI {
 
       // Load custom commands
       await this.commandLoader.loadCommands();
+
+      // Load POLZA.md custom instructions
+      this.customInstructions = await this.polzaMdLoader.load();
 
       // Apply settings
       const savedModel = this.settingsManager.get('model');
@@ -98,6 +105,12 @@ class PolzaCLI {
       console.log(`${colors.yellow}Custom Commands:${colors.reset} ${customCommands.length} loaded`);
     }
 
+    // Show POLZA.md info
+    if (this.polzaMdLoader.hasInstructions()) {
+      const loadedFiles = this.polzaMdLoader.getLoadedFiles();
+      console.log(`${colors.yellow}Custom Instructions:${colors.reset} ${loadedFiles.length} POLZA.md file(s) loaded`);
+    }
+
     console.log(`\n${colors.yellow}Built-in Commands:${colors.reset}`);
     console.log(`  ${colors.dim}/help${colors.reset}      - Show available commands`);
     console.log(`  ${colors.dim}/tools${colors.reset}     - List available tools`);
@@ -111,8 +124,11 @@ class PolzaCLI {
     console.log(`  ${colors.dim}@file.js${colors.reset}   - Include file content in prompt`);
     console.log(`  ${colors.dim}@src/${colors.reset}      - Include directory listing`);
     if (this.yolomode) {
-      console.log(`  ${colors.dim}!{ls -la}${colors.reset}  - Execute shell command in prompt`);
+      console.log(`  ${colors.dim}!ls -la${colors.reset}   - Execute shell command in prompt`);
+      console.log(`  ${colors.dim}!{command}${colors.reset} - Execute shell command (alt syntax)`);
     }
+    console.log(`\n${colors.yellow}Autocompletion:${colors.reset}`);
+    console.log(`  ${colors.dim}Press TAB${colors.reset}  - Autocomplete commands and file paths`);
     console.log();
   }
 
@@ -138,11 +154,16 @@ class PolzaCLI {
       await this.processMessage(this.interactiveMode);
     }
 
-    // Create readline interface
+    // Create readline interface with autocomplete
+    const customCommandNames = this.commandLoader.getAllCommands().map(cmd => cmd.name);
+    const completer = createCompleter(customCommandNames);
+
     this.rl = readline.createInterface({
       input: process.stdin,
       output: process.stdout,
-      prompt: `${colors.cyan}You${colors.reset} > `
+      prompt: `${colors.cyan}You${colors.reset} > `,
+      completer: completer,
+      terminal: true
     });
 
     this.rl.prompt();
@@ -263,6 +284,10 @@ class PolzaCLI {
         }
         break;
 
+      case '/init':
+        await this.handleInitCommand(args);
+        break;
+
       case '/exit':
         await this.saveSession();
         console.log(`${colors.green}Session saved.${colors.reset}`);
@@ -378,11 +403,42 @@ class PolzaCLI {
         }
         break;
 
+      case 'show':
+        if (this.polzaMdLoader.hasInstructions()) {
+          const loadedFiles = this.polzaMdLoader.getLoadedFiles();
+          console.log(`\n${colors.bright}Custom Instructions (POLZA.md):${colors.reset}\n`);
+          console.log(`${colors.yellow}Loaded from:${colors.reset}`);
+          loadedFiles.forEach(file => {
+            console.log(`  ${colors.dim}${file}${colors.reset}`);
+          });
+          console.log(`\n${colors.yellow}Instructions Preview:${colors.reset}`);
+          const preview = this.customInstructions.substring(0, 500);
+          console.log(preview + (this.customInstructions.length > 500 ? '...' : ''));
+        } else {
+          console.log(`${colors.dim}No POLZA.md files found${colors.reset}`);
+          console.log(`\n${colors.yellow}Tip:${colors.reset} Use ${colors.cyan}/init${colors.reset} to create a POLZA.md file`);
+        }
+        break;
+
+      case 'refresh':
+      case 'reload':
+        console.log(`${colors.yellow}Reloading POLZA.md files...${colors.reset}`);
+        this.customInstructions = await this.polzaMdLoader.reload();
+        if (this.polzaMdLoader.hasInstructions()) {
+          console.log(`${colors.green}Reloaded ${this.polzaMdLoader.getLoadedFiles().length} POLZA.md file(s)${colors.reset}`);
+        } else {
+          console.log(`${colors.dim}No POLZA.md files found${colors.reset}`);
+        }
+        break;
+
       default:
         const summary = this.memoryManager.getSummary();
         console.log(`\n${colors.bright}Memory Summary:${colors.reset}`);
         console.log(`  Entries: ${summary.totalEntries}`);
         console.log(`  File: ${summary.memoryFile}`);
+        if (this.polzaMdLoader.hasInstructions()) {
+          console.log(`  POLZA.md files: ${this.polzaMdLoader.getLoadedFiles().length} loaded`);
+        }
         console.log(`\n${colors.yellow}Subcommands:${colors.reset}`);
         console.log(`  /memory set <key> <value> - Save a memory`);
         console.log(`  /memory get <key>         - Retrieve a memory`);
@@ -390,6 +446,8 @@ class PolzaCLI {
         console.log(`  /memory search <query>    - Search memories`);
         console.log(`  /memory delete <key>      - Delete a memory`);
         console.log(`  /memory clear             - Clear all memories`);
+        console.log(`  /memory show              - Show custom instructions (POLZA.md)`);
+        console.log(`  /memory refresh           - Reload POLZA.md files`);
     }
   }
 
@@ -473,6 +531,39 @@ class PolzaCLI {
   }
 
   /**
+   * Handle /init command (create POLZA.md file)
+   */
+  async handleInitCommand(args) {
+    const filePath = args || 'POLZA.md';
+
+    try {
+      // Check if file already exists
+      const fs = await import('fs/promises');
+      try {
+        await fs.access(filePath);
+        console.log(`${colors.yellow}Warning:${colors.reset} ${filePath} already exists`);
+        console.log(`Use ${colors.cyan}/memory show${colors.reset} to view current instructions`);
+        return;
+      } catch {
+        // File doesn't exist, proceed with creation
+      }
+
+      await createDefaultPolzaMd(filePath);
+      console.log(`${colors.green}Created ${filePath}${colors.reset}`);
+      console.log(`\n${colors.yellow}Next steps:${colors.reset}`);
+      console.log(`1. Edit ${filePath} to add your custom instructions`);
+      console.log(`2. Restart polza-cli or use ${colors.cyan}/memory reload${colors.reset} to load the instructions`);
+      console.log(`\n${colors.yellow}Tip:${colors.reset} POLZA.md files are loaded from:`);
+      console.log(`  - Current directory (most specific)`);
+      console.log(`  - Parent directories`);
+      console.log(`  - ~/.polza-cli/POLZA.md (user-level)`);
+      console.log(`  - ~/.config/polza-cli/POLZA.md (global)`);
+    } catch (error) {
+      console.error(`${colors.red}Error creating ${filePath}:${colors.reset} ${error.message}`);
+    }
+  }
+
+  /**
    * Show help information
    */
   showHelp() {
@@ -481,8 +572,9 @@ class PolzaCLI {
     console.log(`${colors.yellow}Built-in Commands:${colors.reset}`);
     console.log(`  ${colors.cyan}/help${colors.reset}                    - Show this help`);
     console.log(`  ${colors.cyan}/tools${colors.reset}                   - List available tools`);
-    console.log(`  ${colors.cyan}/memory [subcommand]${colors.reset}     - Manage persistent memory`);
+    console.log(`  ${colors.cyan}/memory [subcommand]${colors.reset}     - Manage persistent memory & POLZA.md`);
     console.log(`  ${colors.cyan}/settings [subcommand]${colors.reset}   - View/modify settings`);
+    console.log(`  ${colors.cyan}/init [filename]${colors.reset}         - Create a POLZA.md file`);
     console.log(`  ${colors.cyan}/restore [session-id]${colors.reset}    - Restore a saved session`);
     console.log(`  ${colors.cyan}/clear${colors.reset}                   - Clear conversation history`);
     console.log(`  ${colors.cyan}/history${colors.reset}                 - Show conversation history`);
@@ -506,9 +598,11 @@ class PolzaCLI {
     console.log(`  ${colors.cyan}@src/${colors.reset}        - Include directory listing`);
     console.log(`  ${colors.cyan}@"path/file"${colors.reset} - Quote paths with spaces`);
     if (this.yolomode) {
-      console.log(`  ${colors.cyan}!{ls -la}${colors.reset}    - Execute shell command (YOLO mode only)`);
-      console.log(`  ${colors.cyan}!{pwd}${colors.reset}       - Execute any shell command`);
+      console.log(`  ${colors.cyan}!ls -la${colors.reset}      - Execute shell command (YOLO mode only)`);
+      console.log(`  ${colors.cyan}!{pwd}${colors.reset}       - Execute shell command (alt syntax)`);
     }
+    console.log(`\n${colors.yellow}Autocompletion:${colors.reset}`);
+    console.log(`  ${colors.cyan}TAB${colors.reset}          - Autocomplete commands and file paths (use TAB while typing)`);
 
     console.log(`\n${colors.yellow}CLI Flags:${colors.reset}`);
     console.log(`  ${colors.cyan}-p, --prompt${colors.reset}           - Non-interactive mode`);
@@ -522,7 +616,8 @@ class PolzaCLI {
     console.log(`  polza-cli --yolo`);
     console.log(`  polza-cli -m "openai/gpt-4o"`);
     console.log(`  polza-cli -p "Explain @README.md"`);
-    console.log(`  polza-cli -p "List files: !{ls -la}" --yolo`);
+    console.log(`  polza-cli -p "List files: !ls -la" --yolo`);
+    console.log(`  polza-cli -p "Show git status: !git status" --yolo`);
     console.log();
   }
 
@@ -617,11 +712,21 @@ class PolzaCLI {
 
       console.log(`${colors.magenta}Assistant${colors.reset} > ${colors.dim}Thinking...${colors.reset}`);
 
+      // Prepend POLZA.md custom instructions to conversation history (if this is the first message)
+      let messagesWithInstructions = this.conversationHistory;
+      if (this.customInstructions && this.conversationHistory.filter(m => m.role === 'user').length === 1) {
+        // First user message, add custom instructions
+        const systemMessage = this.polzaMdLoader.createSystemMessage();
+        if (systemMessage) {
+          messagesWithInstructions = [systemMessage, ...this.conversationHistory];
+        }
+      }
+
       // Combine all tools
       const allTools = [...fileSystemTools, ...advancedTools];
 
       // Make API call with tools
-      let response = await this.client.chat(this.conversationHistory, {
+      let response = await this.client.chat(messagesWithInstructions, {
         tools: allTools,
         tool_choice: 'auto'
       });

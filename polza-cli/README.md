@@ -7,7 +7,7 @@ A powerful command-line interface client with AI chat, file system access, and a
 This enhanced version includes all features from the original gemini-cli:
 
 ✅ **File Inclusion (@file.js, @src/)** - Include file contents directly in prompts
-✅ **Shell Execution (!{command})** - Execute shell commands within prompts (YOLO mode)
+✅ **Shell Execution (!command)** - Execute shell commands within prompts (YOLO mode)
 ✅ **Command-Line Flags** - `-p` (non-interactive), `-m` (model selection), `--yolo`, `--help`
 ✅ **CLI Commands** - `/help`, `/exit`, `/clear`, `/memory`, `/tools`, `/settings`, `/restore`
 ✅ **Built-in Tools** - grep, shell execution, file operations, glob patterns
@@ -15,6 +15,55 @@ This enhanced version includes all features from the original gemini-cli:
 ✅ **Custom Commands** - Define custom commands via TOML files
 ✅ **Persistent Memory** - Store and retrieve information across sessions
 ✅ **Settings Management** - Configure and save preferences
+
+## 🆕 Latest Enhancements (v1.0.0)
+
+Based on user feedback, we've added these powerful new features:
+
+### 1. **Tab Autocompletion** ⌨️
+- **Command Completion**: Press TAB while typing `/help` → automatically completes to `/help`
+- **File Path Completion**: Type `@README` and press TAB → suggests matching files
+- **Subcommand Completion**: Type `/memory ` and press TAB → shows available subcommands
+- Works with both `/` commands and `@` file references
+
+### 2. **Enhanced Shell Execution** 🔧
+Now supports **both syntaxes** for shell commands:
+- **Direct syntax**: `!ls -la` (NEW! simpler and cleaner)
+- **Braced syntax**: `!{ls -la}` (original syntax, still supported)
+
+Example:
+```bash
+You > Show files: !ls -la
+You > What's my directory? !pwd
+```
+
+### 3. **Custom Instructions (POLZA.md)** 📝
+Like GEMINI.md, but for Polza CLI! Define project-specific instructions that the AI will follow:
+
+- Create with `/init` command
+- Place in project root or home directory
+- Automatically loaded on startup
+- Hierarchical loading (project > parent > home > global)
+- View with `/memory show`
+- Reload with `/memory refresh`
+
+Example POLZA.md:
+```markdown
+# Project Instructions
+- Use TypeScript for all new files
+- Follow functional programming patterns
+- Add JSDoc comments for public functions
+```
+
+### 4. **Session Management** 💾
+- **Save to specific folders**: Sessions are now project-scoped
+- **Better organization**: Each project gets its own session directory
+- **Easy restoration**: `/restore` command lists all available sessions
+
+### 5. **Improved Memory Management** 🧠
+- `/memory show` - View custom instructions from POLZA.md files
+- `/memory refresh` - Reload POLZA.md without restarting
+- Better visibility of loaded configuration files
 
 ## Overview
 
@@ -25,7 +74,7 @@ Polza CLI provides:
 - **Advanced Tools**: grep, shell execution, glob patterns, web search (placeholder)
 - **Tool Calling**: Automatic tool execution based on conversation context
 - **File Inclusion Syntax**: `@file.js` to include files directly in prompts
-- **Shell Command Execution**: `!{ls -la}` to run shell commands (requires YOLO mode)
+- **Shell Command Execution**: `!ls -la` or `!{ls -la}` to run shell commands (requires YOLO mode)
 - **Custom Commands**: Define reusable prompts via TOML files
 - **Persistent Memory**: Remember information across sessions with `/memory`
 - **Settings Management**: Configure preferences with `/settings`
@@ -110,7 +159,7 @@ polza-cli --yolo
 polza-cli -y
 
 # Use in non-interactive mode
-polza-cli -p "Show directory: !{ls -la}" --yolo
+polza-cli -p "Show directory: !ls -la" --yolo
 ```
 
 ### Model Selection
@@ -148,8 +197,9 @@ polza-cli -i "Help me understand this codebase"
 |---------|-------------|
 | `/help` | Show help information and usage examples |
 | `/tools` | List all available tools (file system, grep, shell, etc.) |
-| `/memory [subcommand]` | Manage persistent memory |
+| `/memory [subcommand]` | Manage persistent memory and POLZA.md |
 | `/settings [subcommand]` | View/modify settings |
+| `/init [filename]` | Create a POLZA.md file with template |
 | `/restore [session-id]` | Restore a saved session |
 | `/clear` | Clear conversation history |
 | `/history` | Display conversation history |
@@ -191,15 +241,15 @@ When you use `@file.js`, the CLI:
 3. Includes it in your prompt to the AI
 4. The AI can then analyze, explain, or work with the file
 
-### Shell Execution (`!{command}`)
+### Shell Execution (`!command` or `!{command}`)
 
 Execute shell commands within your prompts (requires `--yolo` mode):
 
 ```
-!{ls -la}          - List files
-!{pwd}             - Print working directory
-!{git status}      - Run git commands
-!{grep -r "TODO"}  - Search files
+!ls -la          - List files (new simpler syntax)
+!pwd             - Print working directory
+!git status      - Run git commands
+!{grep -r "TODO"}  - Search files (braced syntax still supported)
 ```
 
 **Examples:**
@@ -208,7 +258,7 @@ Execute shell commands within your prompts (requires `--yolo` mode):
 # Start with YOLO mode
 polza-cli --yolo
 
-You > What files are in this directory? !{ls -la}
+You > What files are in this directory? !ls -la
 
 You > Show git status: !{git status}
 
@@ -231,6 +281,8 @@ Store and retrieve information across sessions:
 | `search` | `/memory search <query>` | Search memories |
 | `delete` | `/memory delete <key>` | Delete a memory |
 | `clear` | `/memory clear` | Clear all memories |
+| `show` | `/memory show` | Show custom instructions from POLZA.md |
+| `refresh` | `/memory refresh` | Reload POLZA.md files |
 
 ### Memory Examples
 
