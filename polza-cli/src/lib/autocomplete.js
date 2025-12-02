@@ -64,6 +64,12 @@ const SETTINGS_SUBCOMMANDS = ['set', 'get', 'reset', 'path'];
 let commandHistory = [];
 
 /**
+ * Track preview height for proper in-place updates
+ * This is the number of lines the current preview occupies
+ */
+let previewHeight = 0;
+
+/**
  * Set command history for autocomplete suggestions
  * @param {Array<string>} history - Command history array
  */
@@ -265,15 +271,24 @@ export function showFilePreview(line, rl) {
       // Use process.stdout.write instead of rl.write to avoid triggering line events
       const preview = formatFilePreview(completions, partialPath);
 
-      // Update preview in-place without creating new lines:
-      // 1. Save cursor position
-      // 2. Clear from cursor to end of screen
-      // 3. Move to next line and print preview
-      // 4. Restore cursor position
-      process.stdout.write('\x1b7');       // Save cursor position (ESC 7)
+      // Update preview in-place:
+      // 1. If preview exists, move cursor up to where it starts
+      // 2. Clear from cursor to end of screen (removes old preview)
+      // 3. Print new preview
+      // 4. Move cursor back up to input line
+
+      if (previewHeight > 0) {
+        process.stdout.write(`\x1b[${previewHeight}A`); // Move cursor up
+      }
+
       process.stdout.write('\x1b[J');      // Clear from cursor to end of screen
       process.stdout.write('\n' + preview); // Print preview
-      process.stdout.write('\x1b8');       // Restore cursor position (ESC 8)
+
+      // Calculate preview height (number of lines + 1 for the leading \n)
+      previewHeight = preview.split('\n').length + 1;
+
+      // Move cursor back up to input line
+      process.stdout.write(`\x1b[${previewHeight}A`);
     }
   } catch (error) {
     // Silent fail for preview
@@ -321,15 +336,24 @@ export function showCommandPreview(line, rl) {
     // Use process.stdout.write instead of rl.write to avoid triggering line events
     const preview = formatCommandPreview(matches, command);
 
-    // Update preview in-place without creating new lines:
-    // 1. Save cursor position
-    // 2. Clear from cursor to end of screen
-    // 3. Move to next line and print preview
-    // 4. Restore cursor position
-    process.stdout.write('\x1b7');       // Save cursor position (ESC 7)
+    // Update preview in-place:
+    // 1. If preview exists, move cursor up to where it starts
+    // 2. Clear from cursor to end of screen (removes old preview)
+    // 3. Print new preview
+    // 4. Move cursor back up to input line
+
+    if (previewHeight > 0) {
+      process.stdout.write(`\x1b[${previewHeight}A`); // Move cursor up
+    }
+
     process.stdout.write('\x1b[J');      // Clear from cursor to end of screen
     process.stdout.write('\n' + preview); // Print preview
-    process.stdout.write('\x1b8');       // Restore cursor position (ESC 8)
+
+    // Calculate preview height (number of lines + 1 for the leading \n)
+    previewHeight = preview.split('\n').length + 1;
+
+    // Move cursor back up to input line
+    process.stdout.write(`\x1b[${previewHeight}A`);
   }
 }
 
@@ -338,8 +362,14 @@ export function showCommandPreview(line, rl) {
  * This clears any preview text shown below the input line
  */
 export function clearPreview() {
-  // Clear from cursor to end of screen
-  process.stdout.write('\x1b[J');
+  if (previewHeight > 0) {
+    // Move cursor up to where preview starts
+    process.stdout.write(`\x1b[${previewHeight}A`);
+    // Clear from cursor to end of screen
+    process.stdout.write('\x1b[J');
+    // Reset preview height
+    previewHeight = 0;
+  }
 }
 
 /**
