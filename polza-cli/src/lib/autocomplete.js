@@ -47,15 +47,17 @@ export function createCompleter(customCommands = []) {
   // Combine all available commands
   const allCommands = [...SLASH_COMMANDS, ...customCommands.map(cmd => `/${cmd}`)];
 
-  return async function completer(line) {
+  return function completer(line) {
+    const trimmedLine = line.trim();
+    
     // Handle @ file completion
-    if (line.includes('@')) {
-      return handleFileCompletion(line);
+    if (trimmedLine.includes('@')) {
+      return handleFileCompletion(trimmedLine);
     }
 
     // Handle slash command completion
-    if (line.startsWith('/')) {
-      return handleCommandCompletion(line, allCommands);
+    if (trimmedLine.startsWith('/')) {
+      return handleCommandCompletion(trimmedLine, allCommands);
     }
 
     // No completion available
@@ -96,7 +98,7 @@ function handleCommandCompletion(line, allCommands) {
 /**
  * Handle completion for @ file references
  */
-async function handleFileCompletion(line) {
+function handleFileCompletion(line) {
   // Find the last @ in the line
   const lastAtIndex = line.lastIndexOf('@');
   if (lastAtIndex === -1) {
@@ -119,7 +121,7 @@ async function handleFileCompletion(line) {
   const searchPath = pathEndMatch || '';
 
   try {
-    const completions = await findFileCompletions(searchPath);
+    const completions = findFileCompletions(searchPath);
 
     // Format completions with quotes if needed
     const formattedCompletions = completions.map(comp => {
@@ -139,7 +141,7 @@ async function handleFileCompletion(line) {
 /**
  * Find file/directory completions for a partial path
  */
-async function findFileCompletions(partialPath) {
+function findFileCompletions(partialPath) {
   const cwd = process.cwd();
 
   // Parse the partial path
@@ -154,8 +156,8 @@ async function findFileCompletions(partialPath) {
   try {
     // Check if directory exists
     if (!existsSync(dirPath)) {
-      // Try fuzzy file search
-      return await fuzzyFileSearch(searchName, cwd);
+      // Try fuzzy file search (simplified for sync)
+      return fuzzyFileSearch(searchName, cwd);
     }
 
     // Read directory contents
@@ -194,38 +196,39 @@ async function findFileCompletions(partialPath) {
 
     return matches;
   } catch (error) {
-    // Fallback to fuzzy search
-    return await fuzzyFileSearch(searchName, cwd);
+    // Fallback to fuzzy search (simplified for sync)
+    return fuzzyFileSearch(searchName, cwd);
   }
 }
 
 /**
- * Fuzzy file search using glob
+ * Fuzzy file search using glob (simplified sync version)
  */
-async function fuzzyFileSearch(searchName, cwd) {
+function fuzzyFileSearch(searchName, cwd) {
   if (!searchName || searchName.length < 2) {
     return [];
   }
 
   try {
-    const results = await glob(`**/*${searchName}*`, {
-      cwd,
-      ignore: ['**/node_modules/**', '**/.git/**', '**/dist/**', '**/build/**'],
-      onlyFiles: false,
-      caseSensitiveMatch: false,
-      absolute: false
-    });
-
-    return results
-      .slice(0, 20) // Limit results
-      .map(result => {
-        try {
-          const fullPath = path.join(cwd, result);
-          const stats = statSync(fullPath);
-          return stats.isDirectory() ? result + '/' : result;
-        } catch {
-          return result;
+    // Simple fallback: just return basic files from current directory
+    const entries = readdirSync(cwd, { withFileTypes: true });
+    
+    return entries
+      .filter(entry => {
+        // Skip hidden files unless explicitly typed
+        if (entry.name.startsWith('.') && !searchName.startsWith('.')) {
+          return false;
         }
+        // Skip node_modules and .git
+        if (entry.name === 'node_modules' || entry.name === '.git') {
+          return false;
+        }
+        // Match the search pattern
+        return entry.name.toLowerCase().includes(searchName.toLowerCase());
+      })
+      .slice(0, 20) // Limit results
+      .map(entry => {
+        return entry.isDirectory() ? entry.name + '/' : entry.name;
       });
   } catch (error) {
     return [];
