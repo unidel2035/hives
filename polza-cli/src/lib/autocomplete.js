@@ -82,16 +82,37 @@ export function fuzzyScore(pattern, text) {
   pattern = pattern.toLowerCase();
   text = text.toLowerCase();
 
+  // For commands starting with /, also check without the slash
+  const textWithoutSlash = text.startsWith('/') ? text.substring(1) : text;
+  const patternWithoutSlash = pattern.startsWith('/') ? pattern.substring(1) : pattern;
+
   // Exact match gets highest score
   if (text === pattern) return 1000;
+  if (textWithoutSlash === patternWithoutSlash) return 1000;
 
   // Starts with pattern gets high score
   if (text.startsWith(pattern)) return 500 + pattern.length;
+  if (textWithoutSlash.startsWith(patternWithoutSlash)) return 500 + patternWithoutSlash.length;
 
   // Contains pattern gets medium score
   if (text.includes(pattern)) return 250 + pattern.length;
+  if (textWithoutSlash.includes(patternWithoutSlash)) return 250 + patternWithoutSlash.length;
 
   // Fuzzy character-by-character matching
+  // Try matching against both text and textWithoutSlash, use the better score
+  const score1 = fuzzyCharMatch(pattern, text);
+  const score2 = fuzzyCharMatch(patternWithoutSlash, textWithoutSlash);
+
+  return Math.max(score1, score2);
+}
+
+/**
+ * Character-by-character fuzzy matching
+ * @param {string} pattern - The search pattern (lowercase)
+ * @param {string} text - The text to match against (lowercase)
+ * @returns {number} Match score (0 = no match, higher = better match)
+ */
+function fuzzyCharMatch(pattern, text) {
   let score = 0;
   let patternIdx = 0;
   let consecutiveMatches = 0;
