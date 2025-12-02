@@ -17,7 +17,7 @@ import { processPrompt, hasSpecialSyntax } from './lib/prompt-processor.js';
 import { CommandLoader, parseCustomCommand } from './lib/command-loader.js';
 import { MemoryManager } from './lib/memory-manager.js';
 import { SettingsManager } from './lib/settings-manager.js';
-import { createCompleter, updateCompleter, showFilePreview, showCommandPreview } from './lib/autocomplete.js';
+import { createCompleter, updateCompleter, showFilePreview, showCommandPreview, clearPreview } from './lib/autocomplete.js';
 import { PolzaMdLoader, createDefaultPolzaMd } from './lib/polza-md-loader.js';
 
 // ANSI color codes
@@ -216,8 +216,12 @@ class PolzaCLI {
           showFilePreview(currentLine, this.rl);
         }
         // Show command preview for / commands
-        else if (currentLine.startsWith('/')) {
+        else if (currentLine.startsWith('/') && currentLine.length > 1) {
           showCommandPreview(currentLine, this.rl);
+        }
+        // Clear preview if no match
+        else {
+          clearPreview();
         }
       }, 100); // 100ms debounce
     });
@@ -230,6 +234,9 @@ class PolzaCLI {
         clearTimeout(previewTimeout);
         previewTimeout = null;
       }
+
+      // Clear the preview area
+      clearPreview();
 
       if (!trimmedInput) {
         this.rl.prompt();

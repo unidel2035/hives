@@ -239,6 +239,8 @@ function handleCommandCompletionFuzzy(line, allCommands) {
  *
  * IMPORTANT: Uses process.stdout.write() instead of rl.write() to avoid
  * triggering readline 'line' events which would cause unwanted AI queries
+ *
+ * Updates preview in-place without creating new lines (like Gemini CLI)
  */
 export function showFilePreview(line, rl) {
   if (!line.includes('@')) {
@@ -261,13 +263,17 @@ export function showFilePreview(line, rl) {
 
     if (completions.length > 0) {
       // Use process.stdout.write instead of rl.write to avoid triggering line events
-      // Save cursor, move down, print preview, restore cursor
       const preview = formatFilePreview(completions, partialPath);
 
-      // Clear from cursor to end of screen, print preview, then refresh readline
-      process.stdout.write('\x1b[J'); // Clear from cursor to end of screen
-      process.stdout.write('\n' + preview + '\n');
-      rl._refreshLine(); // Refresh the input line
+      // Update preview in-place without creating new lines:
+      // 1. Save cursor position
+      // 2. Clear from cursor to end of screen
+      // 3. Move to next line and print preview
+      // 4. Restore cursor position
+      process.stdout.write('\x1b7');       // Save cursor position (ESC 7)
+      process.stdout.write('\x1b[J');      // Clear from cursor to end of screen
+      process.stdout.write('\n' + preview); // Print preview
+      process.stdout.write('\x1b8');       // Restore cursor position (ESC 8)
     }
   } catch (error) {
     // Silent fail for preview
@@ -280,6 +286,8 @@ export function showFilePreview(line, rl) {
  *
  * IMPORTANT: Uses process.stdout.write() instead of rl.write() to avoid
  * triggering readline 'line' events which would cause unwanted AI queries
+ *
+ * Updates preview in-place without creating new lines (like Gemini CLI)
  */
 export function showCommandPreview(line, rl) {
   if (!line.startsWith('/')) {
@@ -313,11 +321,25 @@ export function showCommandPreview(line, rl) {
     // Use process.stdout.write instead of rl.write to avoid triggering line events
     const preview = formatCommandPreview(matches, command);
 
-    // Clear from cursor to end of screen, print preview, then refresh readline
-    process.stdout.write('\x1b[J'); // Clear from cursor to end of screen
-    process.stdout.write('\n' + preview + '\n');
-    rl._refreshLine(); // Refresh the input line
+    // Update preview in-place without creating new lines:
+    // 1. Save cursor position
+    // 2. Clear from cursor to end of screen
+    // 3. Move to next line and print preview
+    // 4. Restore cursor position
+    process.stdout.write('\x1b7');       // Save cursor position (ESC 7)
+    process.stdout.write('\x1b[J');      // Clear from cursor to end of screen
+    process.stdout.write('\n' + preview); // Print preview
+    process.stdout.write('\x1b8');       // Restore cursor position (ESC 8)
   }
+}
+
+/**
+ * Clear preview area
+ * This clears any preview text shown below the input line
+ */
+export function clearPreview() {
+  // Clear from cursor to end of screen
+  process.stdout.write('\x1b[J');
 }
 
 /**
