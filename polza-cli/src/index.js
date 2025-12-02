@@ -17,7 +17,7 @@ import { processPrompt, hasSpecialSyntax } from './lib/prompt-processor.js';
 import { CommandLoader, parseCustomCommand } from './lib/command-loader.js';
 import { MemoryManager } from './lib/memory-manager.js';
 import { SettingsManager } from './lib/settings-manager.js';
-import { createCompleter, updateCompleter, showFilePreview, showCommandPreview } from './lib/autocomplete.js';
+import { createCompleter, updateCompleter } from './lib/autocomplete.js';
 import { PolzaMdLoader, createDefaultPolzaMd } from './lib/polza-md-loader.js';
 
 // ANSI color codes
@@ -216,26 +216,6 @@ class PolzaCLI {
       // Process user message
       await this.processMessage(trimmedInput);
       this.rl.prompt();
-    });
-
-    // Add interactive preview on keypress
-    this.rl.input.on('keypress', (str, key) => {
-      if (key.ctrl && key.name === 'c') {
-        return; // Let Ctrl+C be handled normally
-      }
-      
-      // Small delay to allow the character to be added to the line
-      setTimeout(() => {
-        // Show file preview when typing @ references
-        if (this.rl.line.includes('@')) {
-          showFilePreview(this.rl.line, this.rl);
-        }
-        
-        // Show command preview when typing / commands
-        if (this.rl.line.startsWith('/')) {
-          showCommandPreview(this.rl.line, this.rl);
-        }
-      }, 10);
     });
 
     this.rl.on('close', () => {
