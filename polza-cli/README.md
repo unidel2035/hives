@@ -2,6 +2,8 @@
 
 A powerful command-line interface client with AI chat, file system access, and advanced features inspired by gemini-cli.
 
+> **🎨 NEW! Modern TUI Edition**: Check out the completely redesigned [Terminal User Interface](./README-TUI.md) built with React/Ink for a beautiful, modern experience!
+
 ## 🚀 New Features (Gemini-CLI Inspired)
 
 This enhanced version includes all features from the original gemini-cli:

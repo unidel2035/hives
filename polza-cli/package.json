@@ -5,11 +5,14 @@
   "main": "src/index.js",
   "type": "module",
   "bin": {
-    "polza-cli": "./src/index.js"
+    "polza-cli": "./src/index.js",
+    "polza-tui": "./src/tui.js"
   },
   "scripts": {
     "start": "node src/index.js",
-    "dev": "node src/index.js"
+    "dev": "node src/index.js",
+    "start:tui": "node src/tui.js",
+    "tui": "node src/tui.js"
   },
   "keywords": [
     "ai",
@@ -22,14 +25,27 @@
   "author": "",
   "license": "Unlicense",
   "dependencies": {
+    "boxen": "^8.0.1",
+    "chalk-animation": "^2.0.3",
+    "cli-spinners": "^3.3.0",
+    "date-fns": "^4.1.0",
     "fast-glob": "^3.3.2",
+    "gradient-string": "^3.0.0",
+    "ink": "^6.5.1",
     "marked": "^15.0.6",
     "marked-terminal": "^7.3.0",
     "minimatch": "^10.0.1",
+    "react": "^19.2.0",
     "toml": "^3.0.0",
     "yargs": "^17.7.2"
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@swc/cli": "^0.7.9",
+    "@swc/core": "^1.15.3",
+    "esbuild": "^0.27.0",
+    "esbuild-register": "^3.6.0"
   }
 }
