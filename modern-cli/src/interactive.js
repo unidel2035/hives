@@ -2,7 +2,7 @@
  * Interactive Mode - Main chat interface
  */
 
-import * as readline from 'readline';
+import readline from 'node:readline';
 import { stdin as input, stdout as output } from 'process';
 import chalk from 'chalk';
 import ora from 'ora';
