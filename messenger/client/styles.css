@@ -575,3 +575,50 @@ body {
     max-width: 85%;
   }
 }
+
+/* ===== Authentication Styles ===== */
+.auth-form {
+  margin-bottom: 20px;
+}
+
+.auth-form small {
+  display: block;
+  color: var(--text-secondary);
+  margin-top: 4px;
+  font-size: 0.85em;
+}
+
+.auth-toggle {
+  text-align: center;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-color);
+}
+
+.auth-toggle a {
+  color: var(--primary-color);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.auth-toggle a:hover {
+  color: var(--primary-dark);
+  text-decoration: underline;
+}
+
+.error-message {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--danger-color);
+  padding: 12px;
+  border-radius: 8px;
+  margin-top: 16px;
+  border: 1px solid var(--danger-color);
+}
+
+.error-message.hidden {
+  display: none;
+}
+
+.hidden {
+  display: none !important;
+}

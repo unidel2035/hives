@@ -21,7 +21,10 @@
   "license": "Unlicense",
   "dependencies": {
     "express": "^4.18.2",
-    "ws": "^8.14.2"
+    "ws": "^8.14.2",
+    "sqlite3": "^5.1.6",
+    "sqlite": "^5.0.1",
+    "bcrypt": "^5.1.1"
   },
   "engines": {
     "node": ">=18.0.0"

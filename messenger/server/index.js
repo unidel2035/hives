@@ -3,8 +3,11 @@
 /**
  * Messenger Server
  *
- * Main server file that provides both HTTP server for static files
- * and WebSocket server for real-time messaging and signaling.
+ * Main server file that provides:
+ * - HTTP server for static files
+ * - REST API for authentication
+ * - WebSocket server for real-time messaging and signaling
+ * - SQLite database for persistence
  */
 
 import express from 'express';
@@ -12,20 +15,134 @@ import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import * as db from './database.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const PORT = process.env.PORT || 3000;
 
+// Initialize database
+await db.initDatabase();
+
 // Express app setup
 const app = express();
 const server = createServer(app);
 
-// Serve static files from client directory
+// Middleware
+app.use(express.json());
 app.use(express.static(join(__dirname, '..', 'client')));
 
-// WebSocket server for real-time communication
+// ===== REST API Endpoints =====
+
+/**
+ * POST /api/register - Register a new user
+ */
+app.post('/api/register', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    const user = await db.registerUser(username, password);
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        username: user.username
+      }
+    });
+  } catch (error) {
+    console.error('[API] Registration error:', error.message);
+    res.status(400).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/login - Login existing user
+ */
+app.post('/api/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    const user = await db.authenticateUser(username, password);
+
+    // Create session token
+    const sessionToken = await db.createSession(user.id, null);
+
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        username: user.username
+      },
+      sessionToken
+    });
+  } catch (error) {
+    console.error('[API] Login error:', error.message);
+    res.status(401).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/validate-session - Validate session token
+ */
+app.post('/api/validate-session', async (req, res) => {
+  try {
+    const { sessionToken } = req.body;
+    const session = await db.validateSession(sessionToken);
+
+    if (!session) {
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid session'
+      });
+    }
+
+    res.json({
+      success: true,
+      user: {
+        id: session.userId,
+        username: session.username
+      }
+    });
+  } catch (error) {
+    console.error('[API] Session validation error:', error.message);
+    res.status(401).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/messages/:roomId - Get messages from a room
+ */
+app.get('/api/messages/:roomId', async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const limit = parseInt(req.query.limit) || 100;
+    const offset = parseInt(req.query.offset) || 0;
+
+    const messages = await db.getRoomMessages(roomId, limit, offset);
+
+    res.json({
+      success: true,
+      messages
+    });
+  } catch (error) {
+    console.error('[API] Get messages error:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// ===== WebSocket Server =====
+
 const wss = new WebSocketServer({ server });
 
 // Store connected clients
@@ -34,7 +151,13 @@ const rooms = new Map();
 
 wss.on('connection', (ws, req) => {
   const clientId = generateId();
-  clients.set(clientId, { ws, userId: null, roomId: null });
+  clients.set(clientId, {
+    ws,
+    userId: null,
+    username: null,
+    roomId: null,
+    sessionToken: null
+  });
 
   console.log(`[Server] Client connected: ${clientId}`);
 
@@ -58,11 +181,15 @@ wss.on('connection', (ws, req) => {
     }
   });
 
-  ws.on('close', () => {
+  ws.on('close', async () => {
     console.log(`[Server] Client disconnected: ${clientId}`);
     const client = clients.get(clientId);
     if (client && client.roomId) {
       leaveRoom(clientId, client.roomId);
+    }
+    // Clean up session
+    if (client && client.sessionToken) {
+      await db.deleteSession(client.sessionToken);
     }
     clients.delete(clientId);
   });
@@ -75,19 +202,23 @@ wss.on('connection', (ws, req) => {
 /**
  * Handle incoming messages from clients
  */
-function handleMessage(clientId, message) {
+async function handleMessage(clientId, message) {
   const client = clients.get(clientId);
   if (!client) return;
 
   console.log(`[Server] Message from ${clientId}:`, message.type);
 
   switch (message.type) {
+    case 'authenticate':
+      await handleAuthenticate(clientId, message);
+      break;
+
     case 'register':
       handleRegister(clientId, message.userId);
       break;
 
     case 'join-room':
-      handleJoinRoom(clientId, message.roomId);
+      await handleJoinRoom(clientId, message.roomId);
       break;
 
     case 'leave-room':
@@ -95,7 +226,7 @@ function handleMessage(clientId, message) {
       break;
 
     case 'chat-message':
-      handleChatMessage(clientId, message);
+      await handleChatMessage(clientId, message);
       break;
 
     case 'webrtc-offer':
@@ -122,30 +253,70 @@ function handleMessage(clientId, message) {
 }
 
 /**
- * Register a user with a userId
+ * Authenticate user with session token
+ */
+async function handleAuthenticate(clientId, message) {
+  const client = clients.get(clientId);
+  if (!client) return;
+
+  try {
+    const session = await db.validateSession(message.sessionToken);
+
+    if (!session) {
+      client.ws.send(JSON.stringify({
+        type: 'auth-failed',
+        error: 'Invalid session token'
+      }));
+      return;
+    }
+
+    client.userId = session.userId;
+    client.username = session.username;
+    client.sessionToken = message.sessionToken;
+
+    client.ws.send(JSON.stringify({
+      type: 'authenticated',
+      userId: session.userId,
+      username: session.username,
+      timestamp: Date.now()
+    }));
+
+    console.log(`[Server] User authenticated: ${session.username} (${clientId})`);
+  } catch (error) {
+    console.error('[Server] Authentication error:', error);
+    client.ws.send(JSON.stringify({
+      type: 'auth-failed',
+      error: 'Authentication failed'
+    }));
+  }
+}
+
+/**
+ * Register a user with a userId (legacy support)
  */
 function handleRegister(clientId, userId) {
   const client = clients.get(clientId);
   if (client) {
     client.userId = userId;
+    client.username = userId;
     client.ws.send(JSON.stringify({
       type: 'registered',
       userId,
       timestamp: Date.now()
     }));
-    console.log(`[Server] User registered: ${userId} (${clientId})`);
+    console.log(`[Server] User registered (legacy): ${userId} (${clientId})`);
   }
 }
 
 /**
  * Handle joining a chat room
  */
-function handleJoinRoom(clientId, roomId) {
+async function handleJoinRoom(clientId, roomId) {
   const client = clients.get(clientId);
-  if (!client || !client.userId) {
+  if (!client || !client.username) {
     client.ws.send(JSON.stringify({
       type: 'error',
-      error: 'Must register before joining room'
+      error: 'Must authenticate before joining room'
     }));
     return;
   }
@@ -155,6 +326,9 @@ function handleJoinRoom(clientId, roomId) {
     leaveRoom(clientId, client.roomId);
   }
 
+  // Create room in database if it doesn't exist
+  await db.createRoom(roomId);
+
   // Join new room
   if (!rooms.has(roomId)) {
     rooms.set(roomId, new Set());
@@ -163,27 +337,36 @@ function handleJoinRoom(clientId, roomId) {
   rooms.get(roomId).add(clientId);
   client.roomId = roomId;
 
+  // Update session
+  if (client.sessionToken) {
+    await db.updateSessionRoom(client.sessionToken, roomId);
+  }
+
   // Get list of users in room
   const usersInRoom = Array.from(rooms.get(roomId))
-    .map(cId => clients.get(cId)?.userId)
+    .map(cId => clients.get(cId)?.username)
     .filter(Boolean);
+
+  // Get message history from database
+  const messages = await db.getRoomMessages(roomId, 50);
 
   // Notify user of successful join
   client.ws.send(JSON.stringify({
     type: 'joined-room',
     roomId,
     users: usersInRoom,
+    messages, // Send history
     timestamp: Date.now()
   }));
 
   // Notify others in room
   broadcastToRoom(roomId, {
     type: 'user-joined',
-    userId: client.userId,
+    userId: client.username,
     timestamp: Date.now()
   }, clientId);
 
-  console.log(`[Server] User ${client.userId} joined room: ${roomId}`);
+  console.log(`[Server] User ${client.username} joined room: ${roomId}`);
 }
 
 /**
@@ -207,10 +390,10 @@ function leaveRoom(clientId, roomId) {
     room.delete(clientId);
 
     // Notify others
-    if (client && client.userId) {
+    if (client && client.username) {
       broadcastToRoom(roomId, {
         type: 'user-left',
-        userId: client.userId,
+        userId: client.username,
         timestamp: Date.now()
       });
     }
@@ -229,7 +412,7 @@ function leaveRoom(clientId, roomId) {
 /**
  * Handle chat messages
  */
-function handleChatMessage(clientId, message) {
+async function handleChatMessage(clientId, message) {
   const client = clients.get(clientId);
   if (!client || !client.roomId) {
     client.ws.send(JSON.stringify({
@@ -239,10 +422,25 @@ function handleChatMessage(clientId, message) {
     return;
   }
 
+  // Save message to database (if user is authenticated)
+  if (client.userId) {
+    try {
+      await db.saveMessage(
+        client.roomId,
+        client.userId,
+        client.username,
+        message.message,
+        message.encrypted || false
+      );
+    } catch (error) {
+      console.error('[Server] Error saving message:', error);
+    }
+  }
+
   // Broadcast message to room (including sender for confirmation)
   broadcastToRoom(client.roomId, {
     type: 'chat-message',
-    userId: client.userId,
+    userId: client.username,
     message: message.message,
     encrypted: message.encrypted,
     timestamp: Date.now()
@@ -256,7 +454,7 @@ function handleWebRTCSignaling(clientId, message) {
   const client = clients.get(clientId);
   if (!client || !client.roomId) return;
 
-  const targetClient = findClientByUserId(message.targetUserId);
+  const targetClient = findClientByUsername(message.targetUserId);
   if (!targetClient) {
     client.ws.send(JSON.stringify({
       type: 'error',
@@ -268,7 +466,7 @@ function handleWebRTCSignaling(clientId, message) {
   // Forward signaling message to target
   targetClient.ws.send(JSON.stringify({
     type: message.type,
-    fromUserId: client.userId,
+    fromUserId: client.username,
     data: message.data,
     timestamp: Date.now()
   }));
@@ -279,9 +477,9 @@ function handleWebRTCSignaling(clientId, message) {
  */
 function handleCallUser(clientId, message) {
   const client = clients.get(clientId);
-  if (!client || !client.userId) return;
+  if (!client || !client.username) return;
 
-  const targetClient = findClientByUserId(message.targetUserId);
+  const targetClient = findClientByUsername(message.targetUserId);
   if (!targetClient) {
     client.ws.send(JSON.stringify({
       type: 'error',
@@ -293,12 +491,12 @@ function handleCallUser(clientId, message) {
   // Forward call request to target
   targetClient.ws.send(JSON.stringify({
     type: 'incoming-call',
-    fromUserId: client.userId,
+    fromUserId: client.username,
     callType: message.callType, // 'voice' or 'video'
     timestamp: Date.now()
   }));
 
-  console.log(`[Server] Call from ${client.userId} to ${message.targetUserId}`);
+  console.log(`[Server] Call from ${client.username} to ${message.targetUserId}`);
 }
 
 /**
@@ -306,20 +504,20 @@ function handleCallUser(clientId, message) {
  */
 function handleCallResponse(clientId, message) {
   const client = clients.get(clientId);
-  if (!client || !client.userId) return;
+  if (!client || !client.username) return;
 
-  const targetClient = findClientByUserId(message.targetUserId);
+  const targetClient = findClientByUsername(message.targetUserId);
   if (!targetClient) return;
 
   // Forward response to caller
   targetClient.ws.send(JSON.stringify({
     type: 'call-response',
-    fromUserId: client.userId,
+    fromUserId: client.username,
     accepted: message.accepted,
     timestamp: Date.now()
   }));
 
-  console.log(`[Server] Call response from ${client.userId}: ${message.accepted ? 'accepted' : 'rejected'}`);
+  console.log(`[Server] Call response from ${client.username}: ${message.accepted ? 'accepted' : 'rejected'}`);
 }
 
 /**
@@ -327,19 +525,19 @@ function handleCallResponse(clientId, message) {
  */
 function handleEndCall(clientId, message) {
   const client = clients.get(clientId);
-  if (!client || !client.userId) return;
+  if (!client || !client.username) return;
 
-  const targetClient = findClientByUserId(message.targetUserId);
+  const targetClient = findClientByUsername(message.targetUserId);
   if (!targetClient) return;
 
   // Notify other party
   targetClient.ws.send(JSON.stringify({
     type: 'call-ended',
-    fromUserId: client.userId,
+    fromUserId: client.username,
     timestamp: Date.now()
   }));
 
-  console.log(`[Server] Call ended by ${client.userId}`);
+  console.log(`[Server] Call ended by ${client.username}`);
 }
 
 /**
@@ -362,11 +560,11 @@ function broadcastToRoom(roomId, message, excludeClientId = null) {
 }
 
 /**
- * Helper: Find client by userId
+ * Helper: Find client by username
  */
-function findClientByUserId(userId) {
+function findClientByUsername(username) {
   for (const [clientId, client] of clients.entries()) {
-    if (client.userId === userId) {
+    if (client.username === username) {
       return client;
     }
   }
@@ -381,6 +579,29 @@ function generateId() {
          Math.random().toString(36).substring(2, 15);
 }
 
+// Cleanup old sessions periodically (every hour)
+setInterval(async () => {
+  try {
+    await db.cleanupOldSessions(24);
+    console.log('[Server] Cleaned up old sessions');
+  } catch (error) {
+    console.error('[Server] Error cleaning up sessions:', error);
+  }
+}, 60 * 60 * 1000);
+
+// Graceful shutdown
+process.on('SIGINT', async () => {
+  console.log('\n[Server] Shutting down...');
+  await db.closeDatabase();
+  process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+  console.log('\n[Server] Shutting down...');
+  await db.closeDatabase();
+  process.exit(0);
+});
+
 // Start server
 server.listen(PORT, () => {
   console.log(`
@@ -391,9 +612,11 @@ server.listen(PORT, () => {
 ║  Server running on: http://localhost:${PORT}       ║
 ║                                                   ║
 ║  Features:                                        ║
+║  ✅ User registration and authentication         ║
+║  ✅ SQLite database for persistence              ║
 ║  ✅ WebSocket real-time messaging                ║
 ║  ✅ WebRTC signaling for P2P calls               ║
-║  ✅ Room-based chat                               ║
+║  ✅ Room-based chat with history                 ║
 ║  ✅ Voice and video call support                 ║
 ║  ✅ End-to-end encryption ready                  ║
 ║                                                   ║
