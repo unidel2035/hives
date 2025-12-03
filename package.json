@@ -1,4 +1,30 @@
 {
+  "name": "hives-cli",
+  "version": "1.0.0",
+  "description": "Modern CLI client inspired by Gemini CLI, powered by Polza AI",
+  "type": "module",
+  "bin": {
+    "hives": "./hives.js"
+  },
+  "scripts": {
+    "start": "node hives.js",
+    "test": "echo \"Run tests for polza-cli and hive-mind2\"",
+    "format": "prettier --write ."
+  },
+  "keywords": [
+    "ai",
+    "cli",
+    "chat",
+    "polza",
+    "assistant",
+    "terminal",
+    "gemini-style"
+  ],
+  "author": "",
+  "license": "Unlicense",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "devDependencies": {
     "prettier": "^3.6.2"
   }
