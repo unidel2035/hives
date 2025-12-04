@@ -121,6 +121,13 @@ export class SettingsManager {
   }
 
   /**
+   * Get all settings
+   */
+  getAll() {
+    return this.settings;
+  }
+
+  /**
    * Get a setting value by path (e.g., 'ui.theme')
    */
   get(path) {
