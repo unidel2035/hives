@@ -585,9 +585,36 @@ You > /export markdown conversation.md
 You > /export json conversation.json
 ```
 
-## 🎯 Available Models
+## 🎯 AI Models and Providers
 
-Hives Modern CLI supports various AI models through Polza AI:
+### Supported Providers
+
+Hives Modern CLI is powered by **[Polza AI](https://polza.ai)**, a unified API gateway that provides access to **100+ AI models** from multiple providers:
+
+- **Anthropic** - Claude models (Sonnet, Opus, Haiku)
+- **OpenAI** - GPT-4, GPT-3.5, and O1 reasoning models
+- **DeepSeek** - DeepSeek R1 reasoning models
+- **Google** - Gemini models
+- **And many more** - Through Polza's multi-provider platform
+
+**Key Advantage**: Unlike single-provider CLIs (like Gemini CLI which only supports Google's models), Modern CLI lets you switch between any provider with a simple `-m` flag.
+
+### Supported Model Types
+
+Modern CLI understands and supports the following types of AI models:
+
+| Model Type | Description | Examples |
+|------------|-------------|----------|
+| **Chat Completion Models** | Standard conversational AI models | All Claude, GPT-4, Gemini models |
+| **Reasoning Models** | Models with enhanced reasoning capabilities | `openai/o1-preview`, `deepseek/deepseek-r1` |
+| **Multimodal Models** | Models that can process text + images | Most modern models (supports PNG, JPG, GIF, etc.) |
+| **Tool-Calling Models** | Models that can call functions/tools | All supported models have tool-calling capability |
+
+All models use the OpenAI-compatible chat/completions API format through Polza AI's unified endpoint.
+
+### Available Models
+
+Here are some popular models you can use:
 
 | Provider | Model ID | Description |
 |----------|----------|-------------|
@@ -596,10 +623,14 @@ Hives Modern CLI supports various AI models through Polza AI:
 | OpenAI | `openai/gpt-4o` | GPT-4 Optimized |
 | OpenAI | `openai/o1-preview` | O1 with reasoning |
 | OpenAI | `openai/gpt-4o-mini` | GPT-4 Mini (cost-effective) |
-| DeepSeek | `deepseek/deepseek-r1` | DeepSeek R1 |
+| DeepSeek | `deepseek/deepseek-r1` | DeepSeek R1 with reasoning |
 | Google | `google/gemini-pro` | Google Gemini Pro |
 
-Change models:
+**Note**: Polza AI supports 100+ additional models. Visit [polza.ai](https://polza.ai) for the complete list.
+
+### Changing Models
+
+Switch between models easily:
 
 ```bash
 # Command-line flag
@@ -607,6 +638,16 @@ node src/index.js -m "openai/gpt-4o"
 
 # Or in interactive mode
 You > /model openai/gpt-4o
+
+# Set default model via environment variable
+export POLZA_DEFAULT_MODEL="anthropic/claude-3-5-sonnet"
+
+# Or in settings file (~/.hives-cli/settings.json)
+{
+  "general": {
+    "model": "openai/gpt-4o"
+  }
+}
 ```
 
 ## 🏗️ Architecture
