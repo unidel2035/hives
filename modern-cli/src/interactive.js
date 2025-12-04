@@ -67,7 +67,6 @@ export async function startInteractive(config) {
 
   // Handle SIGINT (Ctrl+C) gracefully with double-press to exit
   rl.on('SIGINT', () => {
-    sigintReceived = true; // Mark that SIGINT was received
     ctrlCCount++;
 
     // Clear existing timeout
@@ -77,6 +76,7 @@ export async function startInteractive(config) {
 
     if (ctrlCCount === 1) {
       console.log(chalk.yellow('\n(To exit, press Ctrl+C again or type /exit)'));
+      sigintReceived = true; // Mark that SIGINT was received
 
       // Reset count after 2 seconds
       ctrlCTimeout = setTimeout(() => {
@@ -95,15 +95,32 @@ export async function startInteractive(config) {
     try {
       const userInput = await question(chalk.green.bold('You > '));
 
-      // If SIGINT was received, skip processing this empty input
-      // (readline emits an empty line after SIGINT)
+      // If SIGINT was received, the question returns empty string
+      // Skip this iteration to avoid showing the prompt again immediately
       if (sigintReceived) {
         sigintReceived = false;
         continue;
       }
 
       if (!userInput.trim()) {
+        // Reset Ctrl+C counter when user types something (even if empty)
+        if (ctrlCCount > 0) {
+          ctrlCCount = 0;
+          if (ctrlCTimeout) {
+            clearTimeout(ctrlCTimeout);
+            ctrlCTimeout = null;
+          }
+        }
         continue;
+      }
+
+      // Reset Ctrl+C counter when user types a real command
+      if (ctrlCCount > 0) {
+        ctrlCCount = 0;
+        if (ctrlCTimeout) {
+          clearTimeout(ctrlCTimeout);
+          ctrlCTimeout = null;
+        }
       }
 
       // Add to history
