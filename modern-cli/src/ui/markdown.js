@@ -1,37 +1,111 @@
 /**
- * Markdown Renderer - Beautiful terminal markdown
+ * Markdown Renderer - Beautiful terminal markdown with custom renderer
+ * Using marked v15 token-based renderer API
  */
 
 import { marked } from 'marked';
-import TerminalRenderer from 'marked-terminal';
+import chalk from 'chalk';
 
-// Configure marked to use terminal renderer
-marked.setOptions({
-  renderer: new TerminalRenderer({
-    code: (code) => `\x1b[90m${code}\x1b[0m`,
-    blockquote: (quote) => `\x1b[90m│ ${quote}\x1b[0m`,
-    heading: (text, level) => {
-      const colors = ['\x1b[1;36m', '\x1b[1;35m', '\x1b[1;33m'];
-      const color = colors[Math.min(level - 1, 2)];
-      return `${color}${text}\x1b[0m\n`;
+// Create custom renderer that handles marked v15 token objects
+marked.use({
+  mangle: false,
+  headerIds: false,
+  breaks: true,
+  renderer: {
+    code(token) {
+      const code = token.text;
+      return '\n' + chalk.gray(code.split('\n').map(line => `  ${line}`).join('\n')) + '\n\n';
     },
-    strong: (text) => `\x1b[1m${text}\x1b[0m`,
-    em: (text) => `\x1b[3m${text}\x1b[0m`,
-    codespan: (text) => `\x1b[36m${text}\x1b[0m`,
-    list: (body, ordered) => body,
-    listitem: (text) => `  • ${text}`,
-  }),
+
+    blockquote(token) {
+      const text = this.parser.parse(token.tokens);
+      return '\n' + chalk.gray('│ ' + text.replace(/\n/g, '\n│ ')) + '\n';
+    },
+
+    heading(token) {
+      const text = this.parser.parseInline(token.tokens);
+      const level = token.depth;
+      const colors = [chalk.bold.cyan, chalk.bold.magenta, chalk.bold.yellow];
+      const colorFn = colors[Math.min(level - 1, 2)] || chalk.bold;
+      return '\n' + colorFn(text) + '\n';
+    },
+
+    hr(token) {
+      return '\n' + chalk.gray('─'.repeat(40)) + '\n';
+    },
+
+    list(token) {
+      let output = '\n';
+      // Render each list item manually
+      for (const item of token.items) {
+        const bullet = chalk.cyan('•');
+        // Parse the item's content
+        const itemText = this.parser.parse(item.tokens).trim();
+        output += `  ${bullet} ${itemText}\n`;
+      }
+      return output;
+    },
+
+    paragraph(token) {
+      const text = this.parser.parseInline(token.tokens);
+      return text + '\n\n';
+    },
+
+    strong(token) {
+      const text = this.parser.parseInline(token.tokens);
+      return chalk.bold(text);
+    },
+
+    em(token) {
+      const text = this.parser.parseInline(token.tokens);
+      return chalk.italic(text);
+    },
+
+    codespan(token) {
+      return chalk.cyan(token.text);
+    },
+
+    br(token) {
+      return '\n';
+    },
+
+    del(token) {
+      const text = this.parser.parseInline(token.tokens);
+      return chalk.strikethrough(text);
+    },
+
+    link(token) {
+      const text = this.parser.parseInline(token.tokens);
+      return chalk.blue.underline(text || token.href);
+    },
+
+    image(token) {
+      return chalk.blue(`[Image: ${token.text || token.href}]`);
+    },
+
+    text(token) {
+      return token.text;
+    },
+
+    space(token) {
+      return '';
+    }
+  }
 });
 
 /**
- * Render markdown to terminal
+ * Render markdown to terminal with clean formatting
  */
 export function renderMarkdown(text) {
   try {
-    const rendered = marked(text);
-    console.log(rendered);
+    // Parse and render markdown
+    const rendered = marked.parse(text);
+    // Clean up excessive newlines
+    const cleaned = rendered.replace(/\n{3,}/g, '\n\n').trim();
+    console.log(cleaned);
   } catch (error) {
     // Fallback to plain text if markdown rendering fails
+    console.error('Markdown rendering error:', error.message);
     console.log(text);
   }
 }

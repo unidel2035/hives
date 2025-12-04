@@ -2,7 +2,6 @@
  * Interactive Mode - Main chat interface
  */
 
-import readline from 'node:readline';
 import { stdin as input, stdout as output } from 'process';
 import chalk from 'chalk';
 import ora from 'ora';
@@ -12,7 +11,7 @@ import { renderMarkdown } from './ui/markdown.js';
 import { processPrompt } from './utils/prompt-processor.js';
 import { handleCommand } from './commands/index.js';
 import { createCompleter } from './utils/completer.js';
-import { reverseSearch } from './utils/reverse-search.js';
+import { createEnhancedReadline } from './utils/enhanced-readline.js';
 
 /**
  * Start interactive session
@@ -31,8 +30,8 @@ export async function startInteractive(config) {
   // Create completer with history access
   const completer = createCompleter(() => commandHistory);
 
-  // Create readline interface with autocomplete
-  const rl = readline.createInterface({
+  // Create enhanced readline interface with visual autocomplete
+  const rl = createEnhancedReadline({
     input,
     output,
     completer,

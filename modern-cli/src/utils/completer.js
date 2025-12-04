@@ -1,9 +1,10 @@
 /**
- * Autocomplete and fuzzy search functionality
+ * Autocomplete and fuzzy search functionality with highlighting
  */
 
 import fs from 'fs';
 import path from 'path';
+import chalk from 'chalk';
 
 /**
  * Available slash commands
@@ -109,6 +110,32 @@ export function fuzzyScore(pattern, text) {
 }
 
 /**
+ * Highlight matching characters in text based on pattern
+ */
+export function highlightMatch(pattern, text) {
+  if (!pattern) return text;
+
+  const lowerPattern = pattern.toLowerCase();
+  const lowerText = text.toLowerCase();
+
+  let result = '';
+  let patternIdx = 0;
+
+  for (let i = 0; i < text.length; i++) {
+    if (patternIdx < lowerPattern.length && lowerText[i] === lowerPattern[patternIdx]) {
+      // Highlight matching character
+      result += chalk.yellow.bold(text[i]);
+      patternIdx++;
+    } else {
+      // Regular character
+      result += chalk.dim(text[i]);
+    }
+  }
+
+  return result;
+}
+
+/**
  * Get files in a directory (for @ completion)
  */
 export function getFilesInDirectory(dirPath, maxDepth = 2) {
@@ -150,7 +177,19 @@ export function getFilesInDirectory(dirPath, maxDepth = 2) {
 }
 
 /**
- * Completer function for readline
+ * Format completion list with highlighting
+ */
+export function formatCompletions(pattern, completions, maxDisplay = 10) {
+  if (completions.length === 0) return '';
+
+  const displayItems = completions.slice(0, maxDisplay);
+  const formatted = displayItems.map(item => highlightMatch(pattern, item)).join('  ');
+
+  return '\n' + formatted + (completions.length > maxDisplay ? chalk.dim(` (+${completions.length - maxDisplay} more)`) : '');
+}
+
+/**
+ * Completer function for readline with enhanced fuzzy matching
  */
 export function createCompleter(historyGetter) {
   return function completer(line) {
@@ -158,8 +197,22 @@ export function createCompleter(historyGetter) {
 
     // Autocomplete slash commands
     if (trimmedLine.startsWith('/')) {
-      const hits = SLASH_COMMANDS.filter(cmd => cmd.startsWith(trimmedLine));
-      return [hits.length ? hits : SLASH_COMMANDS, trimmedLine];
+      const pattern = trimmedLine.substring(1);
+
+      // Use fuzzy matching for commands
+      const matches = SLASH_COMMANDS
+        .filter(cmd => fuzzyMatch(pattern, cmd.substring(1)))
+        .map(cmd => ({
+          cmd,
+          score: fuzzyScore(pattern, cmd.substring(1)),
+        }))
+        .sort((a, b) => b.score - a.score)
+        .map(m => m.cmd);
+
+      // If we have matches, return them; otherwise show all commands
+      const hits = matches.length > 0 ? matches : SLASH_COMMANDS;
+
+      return [hits, trimmedLine];
     }
 
     // Autocomplete @file references
