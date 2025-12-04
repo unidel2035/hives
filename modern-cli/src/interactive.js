@@ -169,15 +169,22 @@ export async function startInteractive(config) {
           spinner.stop();
           spinner.clear();
 
-          // Display streaming response
+          // Display streaming response character by character
           console.log(chalk.blue.bold('\nAssistant > '));
           let fullResponse = '';
 
           for await (const chunk of response) {
             if (chunk.choices?.[0]?.delta?.content) {
               const text = chunk.choices[0].delta.content;
-              process.stdout.write(text);
-              fullResponse += text;
+
+              // Stream character by character with slight delay for visual effect
+              for (const char of text) {
+                process.stdout.write(char);
+                fullResponse += char;
+
+                // Small delay to make streaming visible (1-2ms per character)
+                await new Promise(resolve => setTimeout(resolve, 1));
+              }
             }
           }
 

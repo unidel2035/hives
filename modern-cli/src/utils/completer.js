@@ -111,10 +111,10 @@ export function fuzzyScore(pattern, text) {
 
 /**
  * Highlight matching characters in text based on pattern
- * Returns text with matching chars highlighted in cyan and rest in white
+ * Returns text with matching chars highlighted (modern style like fzf, VS Code)
  */
 export function highlightMatch(pattern, text) {
-  if (!pattern) return chalk.white(text);
+  if (!pattern) return chalk.dim(text);
 
   const lowerPattern = pattern.toLowerCase();
   const lowerText = text.toLowerCase();
@@ -124,12 +124,12 @@ export function highlightMatch(pattern, text) {
 
   for (let i = 0; i < text.length; i++) {
     if (patternIdx < lowerPattern.length && lowerText[i] === lowerPattern[patternIdx]) {
-      // Highlight matching character in bright cyan
-      result += chalk.cyan.bold(text[i]);
+      // Highlight matching character in bright yellow (stands out more)
+      result += chalk.yellow.bold(text[i]);
       patternIdx++;
     } else {
-      // Regular character in normal white
-      result += chalk.white(text[i]);
+      // Regular character in dim white
+      result += chalk.dim(text[i]);
     }
   }
 

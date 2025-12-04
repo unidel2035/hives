@@ -13,69 +13,66 @@ export function createEnhancedReadline(options) {
   const rl = readline.createInterface(options);
   const originalCompleter = options.completer;
 
-  // Store last completions for display
-  let lastCompletions = [];
-  let lastPattern = '';
+  // Wrap the completer to work synchronously with readline
+  if (originalCompleter) {
+    // Create a wrapped completer that readline can use
+    const wrappedCompleter = (line) => {
+      try {
+        const result = originalCompleter(line);
 
-  // Override internal _tabComplete to add visual feedback
-  const originalTabComplete = rl._tabComplete.bind(rl);
+        // Extract pattern for highlighting
+        const [completions, pattern] = result;
 
-  rl._tabComplete = function () {
-    const line = this.line;
+        // If multiple completions, show them with highlighting
+        if (completions && completions.length > 1) {
+          // Extract the search pattern for highlighting
+          let searchPattern = pattern || '';
 
-    if (originalCompleter) {
-      originalCompleter(line, (err, [completions, pattern]) => {
-        if (!err && completions && completions.length > 0) {
-          lastCompletions = completions;
-          lastPattern = pattern;
+          if (searchPattern.startsWith('/')) {
+            searchPattern = searchPattern.substring(1);
+          } else if (searchPattern.includes('@')) {
+            const atIndex = searchPattern.lastIndexOf('@');
+            searchPattern = searchPattern.substring(atIndex + 1);
+          }
 
-          // If multiple completions, show them with highlighting
-          if (completions.length > 1) {
-            // Extract the search pattern for highlighting
-            let searchPattern = pattern;
+          // Show highlighted completions on next line
+          const maxDisplay = 9;
+          const displayItems = completions.slice(0, maxDisplay);
 
-            if (pattern.startsWith('/')) {
-              searchPattern = pattern.substring(1);
-            } else if (pattern.includes('@')) {
-              const atIndex = pattern.lastIndexOf('@');
-              searchPattern = pattern.substring(atIndex + 1);
+          // Build the display string
+          const displayLines = displayItems.map(item => {
+            // Extract the relevant part for highlighting
+            if (item.startsWith('/')) {
+              const itemWithoutSlash = item.substring(1);
+              return chalk.gray('/') + highlightMatch(searchPattern, itemWithoutSlash);
+            } else if (item.includes('@')) {
+              const atIndex = item.lastIndexOf('@');
+              const beforeAt = item.substring(0, atIndex + 1);
+              const afterAt = item.substring(atIndex + 1);
+              return chalk.gray(beforeAt) + highlightMatch(searchPattern, afterAt);
+            } else {
+              return highlightMatch(searchPattern, item);
             }
+          });
 
-            // Show highlighted completions
-            const maxDisplay = 10;
-            const displayItems = completions.slice(0, maxDisplay);
+          // Print completions horizontally with spacing
+          console.log('\n' + displayLines.join('  '));
 
-            console.log(''); // New line
-            displayItems.forEach(item => {
-              // Extract the relevant part for highlighting
-              let itemToHighlight = item;
-              if (item.startsWith('/')) {
-                itemToHighlight = item.substring(1);
-                console.log('  ' + chalk.gray('/') + highlightMatch(searchPattern, itemToHighlight));
-              } else if (item.includes('@')) {
-                const atIndex = item.lastIndexOf('@');
-                const beforeAt = item.substring(0, atIndex + 1);
-                const afterAt = item.substring(atIndex + 1);
-                console.log('  ' + chalk.gray(beforeAt) + highlightMatch(searchPattern, afterAt));
-              } else {
-                console.log('  ' + highlightMatch(searchPattern, item));
-              }
-            });
-
-            if (completions.length > maxDisplay) {
-              console.log(chalk.dim(`  ... and ${completions.length - maxDisplay} more`));
-            }
-
-            // Redisplay prompt
-            this._refreshLine();
+          if (completions.length > maxDisplay) {
+            console.log(chalk.dim(`  ... and ${completions.length - maxDisplay} more`));
           }
         }
-      });
-    }
 
-    // Call original tab complete
-    return originalTabComplete();
-  };
+        return result;
+      } catch (error) {
+        // Return empty array on error
+        return [[], line];
+      }
+    };
+
+    // Replace the completer
+    rl.completer = wrappedCompleter;
+  }
 
   return rl;
 }
