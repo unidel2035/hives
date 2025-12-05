@@ -68,11 +68,14 @@ export async function startInteractive(config) {
   const completer = createCompleter(() => commandHistory);
 
   // Create enhanced readline interface with visual autocomplete
+  // Pass history array to enable up/down arrow navigation
   const rl = createEnhancedReadline({
     input,
     output,
     completer,
     terminal: true,
+    history: commandHistory,
+    historySize: 1000,
   });
 
   // Initialize vim mode
@@ -344,7 +347,15 @@ export async function startInteractive(config) {
             }
           }
 
+          // After streaming completes, clear the raw output and render with markdown
           console.log('\n');
+
+          // Move cursor up to overwrite the streamed text with formatted markdown
+          // Note: We keep the raw streaming for real-time feedback, then show formatted version
+          console.log(chalk.gray('─'.repeat(50)));
+          console.log(chalk.blue.bold('Assistant > ') + chalk.dim('(formatted)'));
+          renderMarkdown(fullResponse);
+          console.log();
 
           // Add to conversation history
           client.conversationHistory.push({ role: 'user', content: processedPrompt });

@@ -23,6 +23,8 @@ import readline from 'node:readline';
  * @param {WritableStream} options.output - Output stream
  * @param {Function} options.completer - Completer function (must return plain text!)
  * @param {boolean} options.terminal - Whether streams should be treated as TTY
+ * @param {string[]} options.history - Command history array for up/down arrow navigation
+ * @param {number} options.historySize - Max history size (default: 1000)
  * @returns {readline.Interface} Readline interface
  */
 export function createEnhancedReadline(options) {
