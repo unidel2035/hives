@@ -36,7 +36,7 @@ export async function handleCommand(input, context) {
       return false;
 
     case 'history':
-      showHistory(client);
+      await handleHistoryCommand(args, context);
       return false;
 
     case 'version':
@@ -187,7 +187,7 @@ function showHelp() {
     ['/help', 'Show this help message'],
     ['/exit', 'Exit the CLI'],
     ['/clear', 'Clear the screen'],
-    ['/history', 'Show conversation history'],
+    ['/history [action]', 'Show/manage command history'],
     ['/reset', 'Clear conversation history'],
     ['/version', 'Show version information'],
     ['/provider [name]', 'Change or show current AI provider'],
@@ -247,9 +247,73 @@ function showHelp() {
 }
 
 /**
- * Show conversation history
+ * Handle history command with subcommands
  */
-function showHistory(client) {
+async function handleHistoryCommand(args, context) {
+  const subcommand = args[0]?.toLowerCase();
+
+  switch (subcommand) {
+    case 'commands':
+    case 'cmd':
+      showCommandHistory(context);
+      break;
+
+    case 'conversation':
+    case 'chat':
+      showConversationHistory(context.client);
+      break;
+
+    case 'clear':
+      await clearCommandHistory(context);
+      break;
+
+    case 'show':
+      // Default to showing command history
+      showCommandHistory(context);
+      break;
+
+    default:
+      // Default: show command history (the main feature)
+      showCommandHistory(context);
+      break;
+  }
+}
+
+/**
+ * Show command history (user input commands)
+ */
+function showCommandHistory(context) {
+  const { commandHistory } = context;
+
+  if (!commandHistory || commandHistory.length === 0) {
+    console.log(chalk.gray('\n  No command history yet.\n'));
+    return;
+  }
+
+  console.log(chalk.cyan.bold('\n📜 Command History:\n'));
+
+  // Show last 50 commands
+  const recentHistory = commandHistory.slice(-50);
+  const startIndex = Math.max(0, commandHistory.length - 50);
+
+  recentHistory.forEach((cmd, index) => {
+    const num = chalk.gray(`${(startIndex + index + 1).toString().padStart(4)}  `);
+    console.log(`  ${num}${chalk.white(cmd)}`);
+  });
+
+  if (commandHistory.length > 50) {
+    console.log(chalk.dim(`\n  ... and ${commandHistory.length - 50} more commands`));
+  }
+
+  console.log(chalk.dim(`\n  Total: ${commandHistory.length} commands`));
+  console.log(chalk.dim(`  Location: ${context.historyManager?.getHistoryFile() || 'unknown'}`));
+  console.log();
+}
+
+/**
+ * Show conversation history (AI chat history)
+ */
+function showConversationHistory(client) {
   const history = client.getHistory();
 
   if (history.length === 0) {
@@ -268,6 +332,28 @@ function showHistory(client) {
   }
 
   console.log();
+}
+
+/**
+ * Clear command history
+ */
+async function clearCommandHistory(context) {
+  const { historyManager, commandHistory } = context;
+
+  if (historyManager) {
+    await historyManager.clearHistory();
+    commandHistory.length = 0; // Clear in-memory array
+    console.log(chalk.green('\n✓ Command history cleared\n'));
+  } else {
+    console.log(chalk.yellow('\n⚠️  History manager not available\n'));
+  }
+}
+
+/**
+ * Show conversation history (deprecated - kept for backward compatibility)
+ */
+function showHistory(client) {
+  showConversationHistory(client);
 }
 
 /**

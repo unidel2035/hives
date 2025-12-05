@@ -20,6 +20,7 @@ import { CheckpointManager } from './utils/checkpoints.js';
 import { MCPManager } from './utils/mcp.js';
 import { VimMode } from './utils/vim-mode.js';
 import { BangShellMode, parseBangCommand, executeShellCommand } from './utils/bang-shell.js';
+import { HistoryManager } from './lib/history-manager.js';
 
 /**
  * Start interactive session
@@ -41,6 +42,9 @@ export async function startInteractive(config) {
   const mcpManager = new MCPManager(settingsManager);
   await mcpManager.initialize();
 
+  // Initialize history manager
+  const historyManager = new HistoryManager();
+
   // Initialize AI client using provider factory
   const client = createClient(config);
 
@@ -57,8 +61,8 @@ export async function startInteractive(config) {
   const tools = getTools(config.yoloMode);
   const toolHandlers = getToolHandlers(config.yoloMode);
 
-  // Command history for fuzzy search
-  const commandHistory = [];
+  // Command history for fuzzy search - load from disk
+  const commandHistory = await historyManager.loadHistory();
 
   // Create completer with history access
   const completer = createCompleter(() => commandHistory);
@@ -195,8 +199,12 @@ export async function startInteractive(config) {
       // Add to history
       if (userInput.trim()) {
         commandHistory.push(userInput.trim());
+        // Save to disk asynchronously (don't wait)
+        historyManager.appendToHistory(userInput.trim()).catch(() => {
+          // Silent fail for history save errors
+        });
         // Keep history size manageable
-        if (commandHistory.length > 100) {
+        if (commandHistory.length > 1000) {
           commandHistory.shift();
         }
       }
@@ -265,7 +273,9 @@ export async function startInteractive(config) {
           mcpManager,
           vimMode,
           bangShell,
-          shellCommandHistory
+          shellCommandHistory,
+          historyManager,
+          commandHistory
         };
         const shouldExit = await handleCommand(userInput, context);
         if (shouldExit) {
