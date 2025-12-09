@@ -1461,9 +1461,18 @@ class SSHTunnelApp:
             self.status_label.config(text="🟢 Connected - " + message)
             self.hide_progress()
         else:
-            self.status_label.config(text="🔴 " + message)
+            # Add visual indicator for different states
+            if 'reconnecting' in message.lower():
+                self.status_label.config(text="🔄 " + message)
+            elif 'waiting' in message.lower() or 'network' in message.lower():
+                self.status_label.config(text="⏳ " + message)
+            elif 'restarting' in message.lower():
+                self.status_label.config(text="🔄 " + message)
+            else:
+                self.status_label.config(text="🔴 " + message)
+
             # Показываем прогресс только для определенных статусов
-            if any(keyword in message.lower() for keyword in ['connecting', 'reconnecting', 'waiting']):
+            if any(keyword in message.lower() for keyword in ['connecting', 'reconnecting', 'waiting', 'restarting']):
                 self.show_progress(message)
             else:
                 self.hide_progress()
@@ -1510,10 +1519,7 @@ class SSHTunnelApp:
 
     def run_tunnel_loop(self):
         """Основной цикл туннеля с автореконнектом"""
-        while (
-            not self.is_running
-            and self.reconnect_attempts < self.max_reconnect_attempts
-        ):
+        while self.reconnect_attempts < self.max_reconnect_attempts:
             if self.reconnect_attempts > 0:
                 # Улучшенное сообщение с прогрессом
                 self.log_message(
@@ -1538,10 +1544,14 @@ class SSHTunnelApp:
 
             self.run_single_tunnel()
 
-            if self.is_running and self.auto_reconnect:
+            # FIXED: Check if connection dropped and auto-reconnect is enabled
+            # After run_single_tunnel, is_running will be False if connection was lost
+            if not self.is_running and self.auto_reconnect:
                 self.reconnect_attempts += 1
-                self.log_message("🔌 Connection lost, attempting to reconnect...")
+                self.log_message(f"🔌 Connection lost, attempting to reconnect... ({self.reconnect_attempts}/{self.max_reconnect_attempts})")
+                # Continue to next iteration
             else:
+                # Either user manually stopped or auto-reconnect is disabled
                 break
 
         if self.reconnect_attempts >= self.max_reconnect_attempts:
@@ -1722,6 +1732,11 @@ class SSHTunnelApp:
             self.log_message("Stopping SSH tunnel...")
             was_running = self.is_running
             self.is_running = False
+
+            # Prevent auto-reconnect when user manually stops
+            # Set reconnect attempts to max to exit the loop
+            self.reconnect_attempts = self.max_reconnect_attempts
+
             self.ssh_process.terminate()
 
             try:
@@ -1730,7 +1745,7 @@ class SSHTunnelApp:
             except subprocess.TimeoutExpired:
                 self.ssh_process.kill()
                 self.log_message("SSH tunnel forcefully terminated")
-            
+
             # НЕ сохраняем состояние здесь, чтобы не перезаписать при закрытии приложения
 
     def on_tunnel_started(self):
@@ -1760,7 +1775,8 @@ class SSHTunnelApp:
         self.stop_tunnel()
 
         # Ждем немного для корректного завершения
-        time.sleep(0.5)
+        # Уменьшаем задержку для более быстрого перезапуска
+        time.sleep(0.3)
 
         # Запускаем заново
         self.log_message("🚀 Restarting tunnel...")
